@@ -1,107 +1,168 @@
-# Intro
+---
+created: 2024-12-28T14:24:19+01:00
+updated: 2024-12-28T15:28:54+01:00
+---
+# vim-light-js
 
-Simple and lightweight Vim for web `textarea` and `input` field, to improve writing experience on web.
+> ℹ️ This is a **fork** of an original, currently unmaintained work
+>
+> Library:  [Vim.js](https://github.com/toplan/Vim.js)
+> Author: [Top Lan](https://github.com/toplan).
+>
+> This fork aims to maintain and improve upon the original library, bringing it
+> up to speed with modern JavaScript standards and browsers.
 
-[Demo here](http://toplan.github.io/vimjs/index.html)
+`vim-light.js` aims to be a simple library that brings Vim-like editing
+capabilities to `textarea` and `input type="text"` web fields.
 
-**Note:**
+---
 
-* This project is not to replace powerful IDEs on web pages,
-  but rather as a web side writing(such as blogging, writing notes, ect.) of enhancements.
+## Introduction
 
-* This project is in development, there will be some improvements and new features.
+`vim-light.js` provides a lightweight and intuitive Vim-inspired editing mode
+for `textarea` and `input` fields, which might enhance the user experience
+for Vim users on the web
 
-* Please use the vim instructions in the English input method.
+> **Note:**
+>
+> - This library is definitely **not** designed to replace web-based IDEs!
+>   It focuses on simple, text-only, online embedded use cases, where Vim-like
+>   keybindings might be desirable.
+> - The library is under development, and new features or improvements _will_
+>   be added over time.
+> - Use Vim shortcuts with the **American Keyboard Layout** for optimal
+>   functionality.
 
-![demo gif](http://7o503b.com1.z0.glb.clouddn.com/demo.gif)
+---
 
-[中文文档](https://github.com/toplan/Vim.js/blob/master-dev/README_CN.md)
+## Usage
 
-# Usage
-
-The `vim.min.js` only 19kb, and no any dependencies.
+### Basic Example
 
 ```html
-<script src="/path/to/vim.js"></script>
+<script src="/path/to/vim-light.js"></script>
 <script type="text/javascript">
     vim.open({
-        debug   : true,
-        showMsg : function(msg){
-            alert('vim.js say:' + msg);
+        debug: true,
+        showMsg: function (msg) {
+            alert('vim-light.js says: ' + msg);
         }
     });
 </script>
 ```
 
-# Building
-```
-//install
-npm install vim.js
+Note: `vim-light.js` is lightweight (currently about 20 KiB).
 
-//watch
+### Development and Build Instructions
+
+```bash
+# Install Dependencies
+npm install vim-light.js
+
+# Development Mode (with file watcher)
 npm run dev
 
-//build
+# Build
 npm run build
 
-//build min js file
+# Build Minified JS File
 npm run build_min
 ```
 
-# Browser support
+### Browser Support
 
-* Chrome  v39
-* Firefox  v34, v40
-* Safari
+Tested on the following browsers:  
 
-**Note:** Whether to support other browsers still unknown
+- **Chrome** (v39 and newer)  
+- **Firefox** (v34, v40 and newer)  
+- **Safari**  
 
-# Features
+---
 
-## 1. general mode
-|  Command |    Description |
-| ----- | ----------------------- |
-| Esc   | switch to general mode  |
-| u     | returned to the previous operation |
-| Move the cursor :               |
-| h or ← | move left one character |
-| j or ↓ | move down one line     |
-| k or ↑ | move up one line       |
-| l or → | move right one character |
-| supported nh,nj,nk,nl           |
-| 0 or [HOME]| move to head of line |
-| $ or [End] | move to end of line |
-| G          | go to end |
-| gg         | go to first line |
-| delete, copy and paste:        |
-| x or [Delete] | delete single character |
-| nx or n[Delete] | delete `n` characters |
-| yy         | copy current line |
-| nyy        | copy `n` lines    |
-| dd         | delete current line |
-| ndd        | delete `n` lines  |
-| p,P        | `p` paste after，`P` paste before|
-| w or W     | move to next word |
-| supported nw and nW            |
-| yw         | copy one word     |
-| nyw        | copy `n` words    |
-| dw         | delete one word   |
-| ndw        | delete `n` words  |
+## Features
 
-## 2. edit mode
-|  Command |    Description  |
-| ----- | ----------------------- |
-| i     | insert |
-| I     | insert line head |
-| a     | append |
-| A     | append line tail|
-| o     | open line below and enter edit mode |
-| O     | open line after and enter edit mode |
-| r     | replace one character |
+`vim-light.js` supports 3 modes:
 
-## 3. visual mode
-|  Command |    Description |
-| -----  | ----------------------- |
-| v or V | switch ot visual mode   |
-| y      | copy the selected text  |
-| x or d | delete the selected text|
+1. [Normal Mode](#normal-mode)
+2. [Insert Mode](#insert-mode)
+3. [Visual Mode](#visual-mode)
+
+### <a name="normal-mode"/>Normal Mode
+
+| Command               | Description                         |
+| --------------------- | ----------------------------------- |
+| **Cursor Navigation** |                                     |
+| `h` or `←`            | Move left one char                  |
+| `j` or `↓`            | Move down one line                  |
+| `k` or `↑`            | Move up one line                    |
+| `l` or `→`            | Move right one char                 |
+| `0` or `[Home]`       | Move to the beginning of the line   |
+| `$` or `[End]`        | Move to the end of the line         |
+| `G`                   | Move to the end of the text         |
+| `gg`                  | Move to the first line              |
+| `w` or `W`            | Move to the beginning of next word  |
+| `nw` or `nW`          | Move `n` words forward              |
+| **Copy**              |                                     |
+| `yy`                  | Copy the current line               |
+| `nyy`                 | Copy `n` lines                      |
+| `yw`                  | Copy one word                       |
+| `nyw`                 | Copy `n` words                      |
+| **Destructive**       |                                     |
+| `x` or `[Delete]`     | Delete a single char                |
+| `nx` or `n[Delete]`   | Delete `n` chars                    |
+| `dd`                  | Delete the current line             |
+| `ndd`                 | Delete `n` lines                    |
+| `dw`                  | Delete one word                     |
+| `ndw`                 | Delete `n` words                    |
+| `p`                   | Paste after the cursor              |
+| `P`                   | Paste before the cursor             |
+| `r`                   | Replace a single char               |
+| **Change Modes**      |                                     |
+| _into Edit Mode_      |                                     |
+| `i`                   | Insert before the cursor            |
+| `I`                   | Insert at the beginning of the line |
+| `a`                   | Append after the cursor             |
+| `A`                   | Append at the end of the line       |
+| `o`                   | Open a new line below               |
+| `O`                   | Open a new line above               |
+| _into Visual Mode_    |                                     |
+| `v` / `V`             | Enter Visual Mode                   |
+
+### <a name="insert-mode"/>Insert Mode
+
+| Command | Description                             |
+| ------- | --------------------------------------- |
+| `Esc`   | Switch to Normal Mode                   |
+| &nbsp;  | Any other char will be inserted as such |
+
+### <a name="visual-mode"/>Visual Mode
+
+| Command              | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| **Cursor Selection** |                                                  |
+| `h` or `←`           | Change _selection_ left one char                 |
+| `j` or `↓`           | Change _selection_ down one line                 |
+| `k` or `↑`           | Change _selection_ up one line                   |
+| `l` or `→`           | Change _selection_ right one char                |
+| `0` or `[Home]`      | Change _selection_ to the beginning of the line  |
+| `$` or `[End]`       | Change _selection_ to the end of the line        |
+| `G`                  | Change _selection_ to the end of the text        |
+| `gg`                 | Change _selection_ to the first line             |
+| `w` or `W`           | Change _selection_ to the beginning of next word |
+| `nw` or `nW`         | Change _selection_ `n` words forward             |
+| **Copy**             |                                                  |
+| `y`                  | Copy selection                                   |
+| **Destructive**      |                                                  |
+| `x`, `d`, `[Delete]` | Delete selection                                 |
+| `p`                  | Paste after the cursor                           |
+| `P`                  | Paste before the cursor                          |
+| `r`                  | Replace selection                                |
+| **Change Modes**     |                                                  |
+| `Esc`                | Switch to Normal Mode                            |
+
+---
+
+## Contributing
+
+If you'd like to contribute to this repo, feel free to submit pull requests or
+report issues.
