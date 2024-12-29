@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html>
-<head lang="en">
+<html lang="en-US">
+<head>
     <meta charset="UTF-8">
     <title>Vim.js</title>
-    <style type="text/css">
+    <style>
         body>div{width: 80%}
-        body>div p{margin: 0;margin-bottom: 10px;font-size: 18px;color: #888;}
+        body>div p{
+            margin: 0 0 10px;
+            font-size: 18px;color: #888;
+        }
         input{width: 100%;font-size: 16px;height: 20px;margin-bottom: 15px;}
         textarea{font-size: 16px;;width:100%;word-break: normal;}
     </style>
@@ -13,12 +16,19 @@
 <body>
 <div>
 <p>email</p>
-<input type="text" value="toplan710@gmail.com">
-<p>password</p>
-<input type="password" value="123456">
-<p>tile</p>
-<input type="text" value="Welcome to Vim.js">
-<p>content</p>
+    <label>
+        <input type="text" value="toplan710@gmail.com">
+    </label>
+    <p>password</p>
+    <label>
+        <input type="password" value="123456">
+    </label>
+    <p>tile</p>
+    <label>
+        <input type="text" value="Welcome to Vim.js">
+    </label>
+    <p>content</p>
+    <label>
 <textarea rows="30">
 The MIT License (MIT)
 
@@ -42,8 +52,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 </textarea>
-<p>note</p>
-<textarea rows="10"></textarea>
+    </label>
+    <p>note</p>
+    <label>
+        <textarea rows="10"></textarea>
+    </label>
 </div>
 </body>
 <script src="../build/vim.js"></script>

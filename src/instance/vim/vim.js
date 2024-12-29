@@ -1,357 +1,535 @@
 /**
  * Created by top on 15-9-6.
  */
+
+import {TextUtil} from '../text/text';
+
+// TODO: duplicated constants
 const GENERAL = 'general_mode';
 const COMMAND = 'command_mode';
-const EDIT    = 'edit_mode';
-const VISUAL  = 'visual_mode';
-const _ENTER_ = '\n';
+const EDIT = 'edit_mode';
+const VISUAL = 'visual_mode';
+const ENTER = '\n';
 
-var _ = require('../../util/helper.js');
-var extend = _.extend;
-var textUtil;
+/**
+ * Represents a Vim editor, bound to a text element in the current page
+ * @remarks
+ * Terminology should be changed, to reflect {@link https://www.vim.org/|Vim} documentation,
+ * and to help distinguishing between this class and {@link TextUtil}
+ * @example
+ * `Yank` instead of `Paste`
+ * @see {TextUtil}
+ * @see {HTMLInputElement}
+ * @see {HTMLTextAreaElement}
+ */
+export class Vim {
+    /**
+     * default mode
+     * @type {string}
+     */
+    currentMode = 'edit_mode';
 
-exports._init = function (tu) {
-    extend(this, require('./init.js'));
-    textUtil = tu;
-};
+    /**
+     * Whether there has been a request to replace a character
+     * @type {boolean}
+     */
+    replaceRequest = false;
 
-exports.resetVim = function() {
-    this.replaceRequest = false;
-    this.visualPosition = undefined;
-    this.visualCursor = undefined;
-}
+    /**
+     * Whether there has been a request to paste a new line
+     * TODO: not sure what this is for
+     * @type {boolean}
+     */
+    pasteInNewLineRequest = false;
 
-exports.setTextUtil = function(tu) {
-    textUtil = tu;
-}
+    /**
+     * The starting position of selected text (visual mode)
+     * @type {number|undefined}
+     */
+    visualStart = undefined;
 
-exports.isMode = function (modeName) {
-    return this.currentMode === modeName
-};
+    /**
+     * The end position of selected text (visual mode)
+     * @type {number|undefined}
+     */
+    visualCursor = undefined;
 
-exports.switchModeTo = function (modeName) {
-    if (modeName === GENERAL || modeName === COMMAND || modeName === EDIT || modeName === VISUAL) {
-        this.currentMode = modeName;
+    /**
+     * A reference to {@link TextUtil} dependency
+     * @type {TextUtil}
+     */
+    textUtil = undefined;
+
+    resetVim() {
+        this.replaceRequest = false;
+        this.visualStart = undefined;
+        this.visualCursor = undefined;
     }
-};
 
-exports.resetCursorByMouse = function() {
-    this.switchModeTo(GENERAL);
-    var p = textUtil.getCursorPosition();
-    var sp = textUtil.getCurrLineStartPos();
-    var c = textUtil.getCurrLineCount();
-    if (p === sp && !c) {
-        textUtil.appendText(' ', p);
+    /**
+     *
+     * @param {TextUtil}textUtil1
+     */
+    setTextUtil(textUtil1) {
+        this.textUtil = textUtil1;
     }
-    var ns = textUtil.getNextSymbol(p-1);
-    if (ns && ns !== _ENTER_) {
-        textUtil.select(p, p+1);
-    } else {
-        textUtil.select(p-1, p);
-    }
-};
 
-exports.selectNextCharacter = function() {
-    var p = textUtil.getCursorPosition();
-    if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-        p = this.visualCursor;
+    /**
+     *
+     * @param modeName
+     * @returns {boolean}
+     * @todo Use [rest parameter syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters)
+     *       So it can receive multiple modes (to be tested with `or` logic,
+     *       of course)
+     */
+    isMode(modeName) {
+        return this.currentMode === modeName;
     }
-    if (this.isMode(GENERAL) && textUtil.getNextSymbol(p) == _ENTER_) {
-        return;
-    }
-    if (this.isMode(VISUAL) && textUtil.getNextSymbol(p-1) == _ENTER_) {
-        return;
-    }
-    if (p+1 <= textUtil.getText().length) {
-        var s = p+1;
-        if (this.isMode(VISUAL)) {
-            s = this.visualPosition;
-            this.visualCursor = p+1;
-            var f1 = this.visualCursor;
-            var f2 = this.visualPosition;
-            var f3 = textUtil.getCursorPosition();
-        }
-        //default
-        textUtil.select(s, p+2);
-        //special
-        if (this.isMode(VISUAL)) {
-            if (s == p) {
-                textUtil.select(s, p+2);
-                this.visualCursor = p+2;
-            } else {
-                textUtil.select(s, p+1);
-            }
-            if (f2 > f1 && f2 > f3) {
-                textUtil.select(s, p+1);
-            } else if (f1 == f2 && f2 - f3 == 1) {
-                //textUtil.select(s, p+1);
-                this.visualPosition = f2-1;
-                this.visualCursor = p+2;
-                textUtil.select(s-1, p+2);
-            }
+
+    static modeNames = [GENERAL, COMMAND, EDIT, VISUAL];
+
+    switchModeTo(modeName) {
+        if (Vim.modeNames.indexOf(modeName) > -1) {
+            this.currentMode = modeName;
         }
     }
-};
 
-exports.selectPrevCharacter = function() {
-    var p = textUtil.getCursorPosition();
-    if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-        p = this.visualCursor;
+    resetCursorByMouse() {
+        this.switchModeTo(GENERAL);
+
+        const position = this.textUtil.getCursorPosition();
+        const start = this.textUtil.getCurrLineStartPos();
+        const count = this.textUtil.getCurrLineCount();
+
+        if (position === start && !count) {
+            this.textUtil.appendText(' ', position);
+        }
+
+        const ns = this.textUtil.getNextSymbol(position - 1);
+
+        if (!ns || ns === ENTER) {
+            this.textUtil.select(position - 1, position);
+        } else {
+            this.textUtil.select(position, position + 1);
+        }
     }
-    if (textUtil.getPrevSymbol(p) == _ENTER_) {
-        return;
+
+    /**
+     * Helper for {@link selectNextCharacter}
+     *
+     * @returns {number|undefined}
+     * @private
+     */
+    #getCursorPosition() {
+        let position = this.textUtil.getCursorPosition();
+
+        if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
+            position = this.visualCursor;
+        }
+
+        if (this.isMode(GENERAL) && this.textUtil.getNextSymbol(position) === ENTER) {
+            return undefined;
+        }
+
+        if (this.isMode(VISUAL) && this.textUtil.getNextSymbol(position - 1) === ENTER) {
+            return undefined;
+        }
+
+        if (position + 1 > this.textUtil.getText().length) {
+            return undefined;
+        }
+
+        return position;
     }
-    var s = p-1;
-    if (this.isMode(VISUAL)) {
-        s = this.visualPosition;
-        if (s < p && textUtil.getPrevSymbol(p-1) == _ENTER_) {
+
+    selectNextCharacter() {
+        const position = this.#getCursorPosition();
+
+        if (position === undefined) {
             return;
         }
-        if (s == p) {
-            p = p+1;
-            s = s-1;
-            this.visualPosition = p;
-            this.visualCursor = s;
-        } else if (p == s+1) {
-            s = s+1;
-            p = p-2;
-            this.visualPosition = s;
-            this.visualCursor = p;
-        } else if (p == s-1) {
-            p = s-2;
-            this.visualCursor = p;
+
+        let start = position + 1;
+        let lastVisualCursor = undefined;
+        let lastVisualStart = undefined;
+        let lastCursorPosition = undefined;
+
+        if (this.isMode(VISUAL)) {
+            start = this.visualStart;
+            this.visualCursor = position + 1;
+
+            lastVisualCursor = this.visualCursor;
+            lastVisualStart = this.visualStart;
+            lastCursorPosition = this.textUtil.getCursorPosition();
+        }
+
+        this.textUtil.select(start, position + 2);
+
+        if (!this.isMode(VISUAL)) {
+            return;
+        }
+
+        if (start === position) {
+            this.textUtil.select(start, position + 2);
+            this.visualCursor = position + 2;
         } else {
-            //default
-            if (!(s < p && (p+1 == textUtil.getSelectEndPos()))) {
-                p = p-1;
-            }
-            this.visualCursor = p;
+            this.textUtil.select(start, position + 1);
+        }
+
+        if (lastVisualStart > lastVisualCursor && lastVisualStart > lastCursorPosition) {
+            this.textUtil.select(start, position + 1);
+        } else if (lastVisualCursor === lastVisualStart && lastVisualStart - lastCursorPosition === 1) {
+            this.visualStart = lastVisualStart - 1;
+            this.visualCursor = position + 2;
+            this.textUtil.select(start - 1, position + 2);
         }
     }
-    if (this.visualCursor < 0) {
-        this.visualCursor = 0;
-    }
-    if ((this.isMode(GENERAL) && s>=0) || this.isMode(VISUAL)) {
-        textUtil.select(s, p);
-    }
-};
 
-exports.append = function () {
-    var p = textUtil.getCursorPosition();
-    textUtil.select(p+1, p+1);
-};
+    /**
+     * Helper for {@link selectPrevCharacter}
+     *
+     * @param position
+     * @returns {[number|undefined, number]} `[start, new-position]` tuple,
+     * representing the updated visual selection coordinates
+     * @private
+     */
+    #updateVisualPosition(position) {
+        if (!this.isMode(VISUAL)) {
+            return [position - 1, position];
+        }
 
-exports.insert = function () {
-    var p = textUtil.getCursorPosition();
-    textUtil.select(p, p);
-};
+        let start = this.visualStart;
 
-exports.selectNextLine = function () {
-    var sp = undefined;
-    if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-        sp = this.visualCursor;
+        if (position > start && this.textUtil.getPrevSymbol(position - 1) === ENTER) {
+            return [undefined, position];
+        }
+
+        if (position === start) {
+            this.visualStart = ++position;
+            this.visualCursor = --start;
+
+        } else if (position === start + 1) {
+            this.visualStart = ++start;
+            this.visualCursor = (position -= 2);
+
+        } else if (position === start - 1) {
+            this.visualCursor = position = start - 2;
+
+        } else if (position > start && position === this.textUtil.getSelectEndPos() - 1) {
+            this.visualCursor = position;
+
+        } else {
+            this.visualCursor = --position;
+        }
+
+        return [start, position];
     }
-    var nl = textUtil.getNextLineStart(sp);
-    var nr = textUtil.getNextLineEnd(sp);
-    var nc = nr - nl;
-    var cc = textUtil.getCountFromStartToPosInCurrLine(sp);
-    if (this.isMode(VISUAL) && this.visualCursor != undefined && this.visualPosition < this.visualCursor) {
-        cc = cc-1;
+
+    selectPrevCharacter() {
+        let position1 = this.textUtil.getCursorPosition();
+
+        if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
+            position1 = this.visualCursor;
+        }
+
+        if (this.textUtil.getPrevSymbol(position1) === ENTER) {
+            return;
+        }
+
+        const [start, position] = this.#updateVisualPosition(position1);
+
+        if (start === undefined) {
+            return;
+        }
+
+        this.visualCursor = Math.max(this.visualCursor, 0);
+
+        if (start >= 0 && this.isMode(GENERAL) || this.isMode(VISUAL)) {
+            this.textUtil.select(start, position);
+        }
     }
-    var p = nl + (cc > nc ? nc : cc);
-    if (p <= textUtil.getText().length) {
-        var s = p-1;
+
+    append() {
+        const p = this.textUtil.getCursorPosition();
+        this.textUtil.select(p + 1, p + 1);
+    }
+
+    insert() {
+        const p = this.textUtil.getCursorPosition();
+        this.textUtil.select(p, p);
+    }
+
+    #adjustNextLineVisual(nextLineStart, position) {
+        if (!this.isMode(VISUAL)) {
+            return [position - 1, position];
+        }
+
+        let start = this.visualStart;
+
+        if (start > position) {
+            position--;
+        }
+
+        this.visualCursor = position;
+
+        if (this.textUtil.getSymbol(nextLineStart) === ENTER) {
+
+            this.textUtil.appendText(' ', nextLineStart);
+            this.visualCursor = ++position;
+
+            if (start > position) {
+                // Because the new space character is added, the total number of characters increases,
+                // and the starting position of the visual increases accordingly.
+                this.visualStart = ++start;
+            }
+        }
+
+        return [start, position];
+    }
+
+    #adjustNextLine(nextLineStart, adjustedLength) {
+        let position1 = nextLineStart + adjustedLength;
+
+        if (position1 > this.textUtil.getText().length) {
+            return;
+        }
+
+        const [start, position] = this.#adjustNextLineVisual(nextLineStart, position1);
+        this.textUtil.select(start, position);
+
+        if (this.isMode(GENERAL) && this.textUtil.getSymbol(nextLineStart) === ENTER) {
+            this.textUtil.appendText(' ', nextLineStart);
+        }
+    }
+
+    selectNextLine() {
+        const visualCursor = this.isMode(VISUAL) && this.visualCursor;
+
+        const nextLineStart = this.textUtil.getNextLineStart(visualCursor);
+        const nextLineEnd = this.textUtil.getNextLineEnd(visualCursor);
+        const nextLineLength = nextLineEnd - nextLineStart;
+
+        let currentLineSelectedLength = this.textUtil.getCountFromStartToPosInCurrLine(visualCursor);
+
+        if (this.isMode(VISUAL) && this.visualCursor !== undefined && this.visualStart < this.visualCursor) {
+            currentLineSelectedLength--;
+        }
+
+        const adjustedLength = currentLineSelectedLength > nextLineLength
+            ? nextLineLength
+            : currentLineSelectedLength;
+
+        this.#adjustNextLine(nextLineStart, adjustedLength);
+    }
+
+    #getLengthToCursor(cursorPosition) {
+        let lengthToCursor = this.textUtil.getCountFromStartToPosInCurrLine(cursorPosition);
+
+        return this.isMode(VISUAL) && this.visualCursor !== undefined && this.visualStart < this.visualCursor
+            ? lengthToCursor - 1
+            : lengthToCursor;
+    }
+
+    #makeLastLineSelectionVisual(position) {
+        let start = position - 1;
+        let end = position;
+
         if (this.isMode(VISUAL)) {
-            s = this.visualPosition;
-            if (s > p) {
-                p = p-1;
-            }
-            this.visualCursor = p;
-            if (textUtil.getSymbol(nl) == _ENTER_) {
-                textUtil.appendText(' ', nl);
-                p = p+1;
-                this.visualCursor = p;
-                if (s > p) {
-                    //因为新加了空格符，导致字符总数增加，visual开始位置相应增加
-                    s += 1;
-                    this.visualPosition = s;
-                }
-            }
-        }
-        textUtil.select(s, p);
-        if (this.isMode(GENERAL)) {
-            if (textUtil.getSymbol(nl) == _ENTER_) {
-                textUtil.appendText(' ', nl);
-            }
-        }
-    }
-};
+            start = this.visualStart;
 
-exports.selectPrevLine = function () {
-    var sp = undefined;
-    if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-        sp = this.visualCursor;
+            if (this.textUtil.getPrevSymbol(position) !== ENTER && start !== position - 1 && end < start) {
+                end = position - 1;
+            }
+
+            this.visualCursor = end;
+        }
+
+        this.textUtil.select(start, end);
     }
-    var pl = textUtil.getPrevLineStart(sp);
-    var pr = textUtil.getPrevLineEnd(sp);
-    var cc = textUtil.getCountFromStartToPosInCurrLine(sp);
-    if (this.isMode(VISUAL) && this.visualCursor != undefined && this.visualPosition < this.visualCursor) {
-        cc = cc-1;
+
+    selectPrevLine() {
+        let cursorPosition = undefined;
+
+        if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
+            cursorPosition = this.visualCursor;
+        }
+
+        const prevLineStart = this.textUtil.getPrevLineStart(cursorPosition);
+        const prevLineEnd = this.textUtil.getPrevLineEnd(cursorPosition);
+        const lengthToCursor = this.#getLengthToCursor(cursorPosition);
+
+        const prevLineLength = prevLineEnd - prevLineStart;
+        const position = prevLineStart + (lengthToCursor > prevLineLength ? prevLineLength : lengthToCursor);
+
+        if (position < 0) { return; }
+
+        this.#makeLastLineSelectionVisual(position);
+
+        if (this.isMode(GENERAL) && this.textUtil.getSymbol(prevLineStart) === ENTER) {
+            this.textUtil.appendText(' ', prevLineStart);
+        }
     }
-    var pc = pr - pl;
-    var p = pl + (cc > pc ? pc : cc);
-    if (p >= 0) {
-        var s = p-1;
-        var e = p;
+
+    moveToCurrentLineHead() {
+        const position = this.textUtil.getCurrLineStartPos();
+
+        if (this.isMode(GENERAL)) {
+            this.textUtil.select(position, position + 1);
+        }
+
         if (this.isMode(VISUAL)) {
-            s = this.visualPosition;
-            if (textUtil.getPrevSymbol(p) != _ENTER_ && s != p-1 && e < s) {
-                e = p-1;
-            }
-            this.visualCursor = e;
-        }
-        textUtil.select(s, e);
-        if (this.isMode(GENERAL)) {
-            if (textUtil.getSymbol(pl) == _ENTER_) {
-                textUtil.appendText(' ', pl);
+            const start = this.visualCursor === undefined
+                ? this.textUtil.getCursorPosition()
+                : this.visualCursor;
+
+            for (let i = start; i > position; i--) {
+                this.selectPrevCharacter();
             }
         }
     }
-};
 
-exports.moveToCurrentLineHead = function () {
-    var p = textUtil.getCurrLineStartPos();
-    if (this.isMode(GENERAL)) {
-        textUtil.select(p, p+1);
-    }
-    if (this.isMode(VISUAL)) {
-        var sp = this.visualCursor;
-        if (sp === undefined) {
-            sp = textUtil.getCursorPosition();
-        }
-        for (sp;sp>p;sp--) {
-            this.selectPrevCharacter();
-        }
-    }
-};
-
-exports.moveToCurrentLineTail = function () {
-    var p = textUtil.getCurrLineEndPos();
-    if (this.isMode(GENERAL)) {
-        textUtil.select(p - 1, p);
-    }
-    if (this.isMode(VISUAL)) {
-        var sp = this.visualCursor;
-        if (sp === undefined) {
-            sp = textUtil.getCursorPosition();
-        }
-        p = textUtil.getCurrLineEndPos(sp);
-        if (sp == p-1) {
-            p = p-1
-        }
-        for (sp;sp<p;sp++){
-            this.selectNextCharacter();
-        }
-    }
-};
-
-exports.appendNewLine = function () {
-    var p = textUtil.getCurrLineEndPos();
-    textUtil.appendText(_ENTER_ + " ", p);
-    textUtil.select(p+1, p+1);
-};
-
-exports.insertNewLine = function () {
-    var p = textUtil.getCurrLineStartPos();
-    textUtil.appendText(" " + _ENTER_, p);
-    textUtil.select(p, p);
-};
-
-exports.deleteSelected = function () {
-    var p = textUtil.getCursorPosition();
-    var t = textUtil.delSelected();
-    textUtil.select(p, p+1);
-    this.pasteInNewLineRequest = false;
-    return t;
-};
-
-exports.copyCurrentLine = function (p) {
-    var sp = textUtil.getCurrLineStartPos(p);
-    var ep = textUtil.getCurrLineEndPos(p);
-    //clipboard = textUtil.getText(sp, ep);
-    this.pasteInNewLineRequest= true;
-    return textUtil.getText(sp, ep+1);
-};
-
-exports.backToHistory = function (list) {
-    if (list) {
-        var data = list.pop();
-        if (data !== undefined) {
-            textUtil.setText(data.t);
-            textUtil.select(data.p, data.p+1);
-        }
-    }
-};
-
-exports.delCurrLine = function () {
-    var sp = textUtil.getCurrLineStartPos();
-    var ep = textUtil.getCurrLineEndPos();
-    var t = textUtil.delete(sp, ep+1);
-    textUtil.select(sp, sp+1);
-    this.pasteInNewLineRequest = true;
-    return t;
-};
-
-exports.moveToFirstLine = function () {
-    if (this.isMode(GENERAL)) {
-        textUtil.select(0,1);
-    } else if (this.isMode(VISUAL)) {
-        textUtil.select(this.visualPosition, 0);
-        this.visualCursor = 0;
-    }
-};
-
-exports.moveToLastLine = function () {
-    var lp = textUtil.getText().length;
-    var sp = textUtil.getCurrLineStartPos(lp-1);
-    if (this.isMode(GENERAL)) {
-        textUtil.select(sp, sp+1);
-    } else if (this.isMode(VISUAL)) {
-        textUtil.select(this.visualPosition, sp+1);
-        this.visualCursor = sp+1;
-    }
-};
-
-exports.moveToNextWord = function () {
-    var p;
-    if (this.isMode(VISUAL)) {
-        p = this.visualCursor;
-    }
-    var poses = textUtil.getCurrWordPos(p);
-    //poses[1] is next word`s start position
-    var sp = poses[1];
-    if (sp) {
+    moveToCurrentLineTail() {
         if (this.isMode(GENERAL)) {
-            textUtil.select(sp, sp+1);
+            let position = this.textUtil.getCurrLineEndPos();
+            this.textUtil.select(position - 1, position);
+        }
+
+        if (this.isMode(VISUAL)) {
+            let start = this.visualCursor || this.textUtil.getCursorPosition();
+            let position = this.textUtil.getCurrLineEndPos(start);
+
+            if (start === position - 1) {
+                position--;
+            }
+
+            for (let i = start; i < position; i++) {
+                this.selectNextCharacter();
+            }
+        }
+    }
+
+    appendNewLine() {
+        const position = this.textUtil.getCurrLineEndPos();
+
+        this.textUtil.appendText(ENTER + ' ', position);
+        this.textUtil.select(position + 1, position + 1);
+    }
+
+    insertNewLine() {
+        const position = this.textUtil.getCurrLineStartPos();
+
+        this.textUtil.appendText(' ' + ENTER, position);
+        this.textUtil.select(position, position);
+    }
+
+    deleteSelected() {
+        const position = this.textUtil.getCursorPosition();
+        const deletedText = this.textUtil.delSelected();
+
+        this.textUtil.select(position, position + 1);
+        this.pasteInNewLineRequest = false;
+
+        return deletedText;
+    }
+
+    /**
+     * @author rsenna
+     * If there's no selection, delete char before cursor
+     * If selection is active, **delete whole line**
+     * @remarks
+     * That's the default behaviour of `S-X` on Vim/Neovim
+     */
+    delCurrentLineOrCharBefore() {
+        if (this.isMode(VISUAL)) {
+            this.delCurrLine();
+        } else {
+            this.textUtil.deleteCharBefore();
+        }
+
+        this.switchModeTo(GENERAL);
+    }
+
+    copyCurrentLine(position) {
+        const start = this.textUtil.getCurrLineStartPos(position);
+        const end = this.textUtil.getCurrLineEndPos(position);
+
+        this.pasteInNewLineRequest = true;
+        return this.textUtil.getText(start, end + 1);
+    }
+
+    backToHistory(list) {
+        if (!list) { return; }
+
+        const data = list.pop();
+        if (data === undefined) { return; }
+
+        this.textUtil.setText(data.t);
+        this.textUtil.select(data.p, data.p + 1);
+    }
+
+    delCurrLine() {
+        const start = this.textUtil.getCurrLineStartPos();
+        const end = this.textUtil.getCurrLineEndPos();
+        const text = this.textUtil.deleteText(start, end + 1);
+
+        this.textUtil.select(start, start + 1);
+        this.pasteInNewLineRequest = true;
+
+        return text;
+    }
+
+    moveToFirstLine() {
+        if (this.isMode(GENERAL)) {
+            this.textUtil.select(0, 1);
+
         } else if (this.isMode(VISUAL)) {
-            textUtil.select(this.visualPosition, sp+1);
-            this.visualCursor = sp+1;
+            this.textUtil.select(this.visualStart, 0);
+            this.visualCursor = 0;
         }
     }
-};
 
-exports.copyWord = function (p) {
-    var poses = textUtil.getCurrWordPos(p);
-    return poses[1];
-};
+    moveToLastLine() {
+        const text = this.textUtil.getText().length;
+        const start = this.textUtil.getCurrLineStartPos(text - 1);
 
-exports.deleteWord = function () {
-    var t;
-    var poses = textUtil.getCurrWordPos();
-    if (poses[1]) {
-        t = textUtil.delete(poses[0], poses[1]);
-        textUtil.select(poses[0], poses[0]+1)
+        if (this.isMode(GENERAL)) {
+            this.textUtil.select(start, start + 1);
+
+        } else if (this.isMode(VISUAL)) {
+            this.textUtil.select(this.visualStart, start + 1);
+            this.visualCursor = start + 1;
+        }
     }
-    return t;
-};
+
+    moveToNextWord() {
+        const visualCursor = this.isMode(VISUAL)
+            ? this.visualCursor
+            : undefined;
+
+        const [_, lastCharPos] = this.textUtil.getCurrWordPos(visualCursor);
+        if (!lastCharPos) { return; }
+
+        if (this.isMode(GENERAL)) {
+            this.textUtil.select(lastCharPos, lastCharPos + 1);
+
+        } else if (this.isMode(VISUAL)) {
+            this.textUtil.select(this.visualStart, lastCharPos + 1);
+            this.visualCursor = lastCharPos + 1;
+        }
+    }
+
+    // TODO: why copyWord?!?
+    copyWord(position) {
+        const [_, lastCharPos] = this.textUtil.getCurrWordPos(position);
+        return lastCharPos;
+    }
+
+    deleteWord() {
+        const [position, lastCharPos] = this.textUtil.getCurrWordPos();
+        if (lastCharPos === undefined) { return undefined; }
+
+        const text = this.textUtil.deleteText(position, lastCharPos);
+        this.textUtil.select(position, position + 1);
+        return text;
+    }
+}

@@ -7,7 +7,6 @@
         @media screen {
             ::selection{color:#fff !important;background:#34495e !important;;}
             ::-moz-selection{color:#fff !important;;background:#34495e !important;;}
-            ::-webkit-selection{color:#fff !important;;background:#34495e !important;;}
         }
         body {background: #eceff1;font-size: 16px;font-family: Microsoft YaHei, WenQuanYi Micro Hei, tohoma, sans-serif;
             margin: 0;padding:0 30px 30px 30px;color: #34495e;
@@ -30,18 +29,21 @@
 <body>
 <div class="box">
 <div class="top">
-    <p align="right">
+    <p>
         <a href="https://github.com/toplan/Vim.js" target="_blank">GitHub</a>
     </p>
 </div>
 <div class="header">
-<p align="center"><b>vim<span class="text-light-green">.</span>js</b></p>
+<p><b>vim<span class="text-light-green">.</span>js</b></p>
 </div>
 <div class="wrapper">
     <div class="row">
-        <input class="input" type="text" value="Welcome to vim.js">
+        <label>
+            <input class="input" type="text" value="Welcome to vim.js">
+        </label>
     </div>
     <div class="row">
+        <label>
 <textarea rows="30" class="input">The MIT License (MIT)
 
 Copyright (c) (top lan)
@@ -64,6 +66,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 </textarea>
+        </label>
     </div>
     <div class="row">
         <div class="about">

@@ -2,22 +2,29 @@
  * Created by top on 15-9-6.
  */
 
-exports.extend = function(to, form){
-    for (var key in form) {
+/**
+ * @deprecated
+ * Used to import methods into an object
+ *
+ * @param {Object} to
+ * @param {Object} form
+ * @returns {Object}
+ */
+export const extend = (to, form) => {
+    for (const key in form) {
         to[key] = form[key]
     }
     return to
-}
+};
 
-exports.indexOf = function (array, key) {
-    for (var k in array) {
-        if (array[k] == key) {
-            return k;
-        }
-    }
-    return -1;
-}
+/**
+ *
+ * @param {Array<string>}array
+ * @param {string} key
+ * @returns {number}
+ */
+export const indexOf = (array, key) =>
+    array.indexOf(key);
 
-exports.currentTime = function () {
-    return new Date().getTime();
-}
+export const currentTime = () =>
+    Date.now();

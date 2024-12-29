@@ -1,238 +1,291 @@
 /**
  * Created by top on 15-9-6.
  */
+
+import {App} from './app/app';
+import {Vim} from './vim/vim';
+import {TextUtil} from './text/text';
+
 const GENERAL = 'general_mode';
-const COMMAND = 'command_mode';
-const EDIT    = 'edit_mode';
-const VISUAL  = 'visual_mode';
-const _ENTER_ = '\n';
+const EDIT = 'edit_mode';
+const VISUAL = 'visual_mode';
+const ENTER = '\n';
 
-var App;
-var vim;
-var textUtil;
+export class Controller {
+    /**
+     * @type {App}
+     */
+    app;
 
-exports._init = function (app) {
-    App = app;
-    vim = app.vim;
-    textUtil = app.textUtil;
-}
+    /**
+     * @type {Vim}
+     */
+    vim;
 
-exports.setVim = function(v) {
-    vim = v;
-}
+    /**
+     * @type {TextUtil}
+     */
+    textUtil;
 
-exports.setTextUtil = function(tu) {
-    textUtil = tu;
-}
-
-exports.selectPrevCharacter = function (num) {
-    App.repeatAction(function(){
-        vim.selectPrevCharacter();
-    }, num);
-};
-
-exports.selectNextCharacter = function (num) {
-    App.repeatAction(function(){
-        vim.selectNextCharacter();
-    }, num);
-};
-
-exports.switchModeToGeneral = function () {
-    var cMode= vim.currentMode;
-    if (vim.isMode(GENERAL)) {
-        return;
+    /**
+     *
+     * @param {App} app
+     */
+    _init(app) {
+        this.app = app;
+        this.vim = app.vim;
+        this.textUtil = app.textUtil;
     }
-    vim.switchModeTo(GENERAL);
-    var p = textUtil.getCursorPosition();
-    var sp = textUtil.getCurrLineStartPos();
-    if (p === sp) {
-        var c = textUtil.getCurrLineCount();
-        if (!c) {
-            textUtil.appendText(' ', p);
-        }
-        vim.selectNextCharacter();
-        vim.selectPrevCharacter();
-        if (textUtil.getCurrLineCount() === 1) {
-            textUtil.select(p, p+1);
-        }
-    } else {
-        if (cMode === VISUAL) {
-            vim.selectNextCharacter();
-        }
-        vim.selectPrevCharacter();
-    }
-};
 
-exports.switchModeToVisual = function () {
-    if (vim.isMode(VISUAL)) {
-        var s = vim.visualCursor;
-        if (s === undefined) {
+    /**
+     *
+     * @param {Vim} vim
+     */
+    setVim(vim) { this.vim = vim; }
+
+    /**
+     *
+     * @param {TextUtil} textUtil
+     */
+    setTextUtil(textUtil) { this.textUtil = textUtil; }
+
+    selectPrevCharacter(repeatCount) {
+        this.app.repeat(this.vim.selectPrevCharacter, repeatCount);
+    }
+
+    selectNextCharacter(repeatCount) {
+        this.app.repeat(this.vim.selectNextCharacter, repeatCount);
+    }
+
+    switchModeToGeneral() {
+        const cMode = this.vim.currentMode;
+
+        if (this.vim.isMode(GENERAL)) {
             return;
         }
-        var p = vim.visualPosition;
-        if (p < s) {
-            textUtil.select(s-1, s);
-        } else {
-            textUtil.select(s, s+1);
+
+        this.vim.switchModeTo(GENERAL);
+
+        const position = this.textUtil.getCursorPosition();
+        const start = this.textUtil.getCurrLineStartPos();
+
+        if (position !== start) {
+            if (cMode === VISUAL) { // TODO: is this ever called?
+                this.vim.selectNextCharacter();
+            }
+
+            this.vim.selectPrevCharacter();
+            return;
         }
-        if (textUtil.getPrevSymbol(s) == _ENTER_) {
-            textUtil.select(s, s+1);
+
+        const lineCount = this.textUtil.getCurrLineCount();
+
+        if (!lineCount) {
+            this.textUtil.appendText(' ', position);
         }
-        vim.switchModeTo(GENERAL);
-        return;
+
+        this.vim.selectNextCharacter();
+        this.vim.selectPrevCharacter();
+
+        if (this.textUtil.getCurrLineCount() === 1) {
+            this.textUtil.select(position, position + 1);
+        }
     }
-    vim.switchModeTo(VISUAL);
-    vim.visualPosition = textUtil.getCursorPosition();
-    vim.visualCursor = undefined;
-};
 
-exports.append = function() {
-    vim.append();
-    setTimeout(function () {
-        vim.switchModeTo(EDIT);
-    }, 100);
-};
+    switchModeToVisual() {
+        if (!this.vim.isMode(VISUAL)) {
+            this.vim.switchModeTo(VISUAL);
+            this.vim.visualStart = this.textUtil.getCursorPosition();
+            this.vim.visualCursor = undefined;
+            return;
+        }
 
-exports.appendLineTail = function () {
-    vim.moveToCurrentLineTail();
-    this.append();
-};
+        const start = this.vim.visualCursor;
+        if (start === undefined) { return; }
 
-exports.insert = function() {
-    vim.insert();
-    setTimeout(function () {
-        vim.switchModeTo(EDIT);
-    }, 100);
-};
+        const position = this.vim.visualStart;
 
-exports.insertLineHead = function () {
-    vim.moveToCurrentLineHead();
-    this.insert();
-};
+        if (position < start) {
+            this.textUtil.select(start - 1, start);
+        } else {
+            this.textUtil.select(start, start + 1);
+        }
 
-exports.selectNextLine = function (num) {
-    App.repeatAction(function(){
-        vim.selectNextLine();
-    }, num);
-};
+        if (this.textUtil.getPrevSymbol(start) === ENTER) {
+            this.textUtil.select(start, start + 1);
+        }
 
-exports.selectPrevLine = function (num) {
-    App.repeatAction(function(){
-        vim.selectPrevLine();
-    }, num);
-};
+        this.vim.switchModeTo(GENERAL);
+    }
 
-exports.copyChar = function() {
-    vim.pasteInNewLineRequest = false;
-    App.clipboard = textUtil.getSelectedText();
-    if (vim.isMode(VISUAL)) {
+    append() {
+        this.vim.append();
+        setTimeout(() => this.vim.switchModeTo(EDIT), 100);
+    }
+
+    appendLineTail() {
+        this.vim.moveToCurrentLineTail();
+        this.append();
+    }
+
+    insert() {
+        this.vim.insert();
+        setTimeout(() => this.vim.switchModeTo(EDIT), 100);
+    }
+
+    insertLineHead() {
+        this.vim.moveToCurrentLineHead();
+        this.insert();
+    }
+
+    selectNextLine(repeatCount) {
+        this.app.repeat(this.vim.selectNextLine, repeatCount);
+    }
+
+    selectPrevLine(repeatCount) {
+        this.app.repeat(this.vim.selectPrevLine, repeatCount);
+    }
+
+    copyChar() {
+        this.vim.pasteInNewLineRequest = false;
+        this.app.clipboard = this.textUtil.getSelectedText();
+
+        if (this.vim.isMode(VISUAL)) {
+            this.switchModeToGeneral();
+        }
+    }
+
+    copyCurrentLine(repeatCount) {
+        // TODO: define `Data` class with meaningful property names
+        const data = {
+            p: undefined,
+            t: ''
+        };
+
+        this.app.repeat(() => {
+            data.t = this.vim.copyCurrentLine(data.p);
+            data.p = this.textUtil.getNextLineStart(data.p);
+
+            return data.t;
+        }, repeatCount);
+    }
+
+    pasteAfter() {
+        if (this.app.clipboard === undefined) { return; }
+
+        if (this.vim.pasteInNewLineRequest) {
+            const end = this.textUtil.getCurrLineEndPos();
+            this.textUtil.appendText(ENTER + this.app.clipboard, end, true, true);
+        } else {
+            this.textUtil.appendText(this.app.clipboard, undefined, true, false);
+        }
+    }
+
+    pasteBefore() {
+        if (this.app.clipboard === undefined) { return; }
+
+        if (this.vim.pasteInNewLineRequest) {
+            const start = this.textUtil.getCurrLineStartPos();
+            this.textUtil.insertText(this.app.clipboard + ENTER, start, true, true);
+        } else {
+            this.textUtil.insertText(this.app.clipboard, undefined, true, false);
+        }
+    }
+
+    moveToCurrentLineHead() {
+        this.vim.moveToCurrentLineHead();
+    }
+
+    moveToCurrentLineTail() {
+        this.vim.moveToCurrentLineTail();
+    }
+
+    replaceChar() {
+        this.vim.replaceRequest = true;
+    }
+
+    appendNewLine() {
+        this.vim.appendNewLine();
+
+        setTimeout(() => this.vim.switchModeTo(EDIT), 100);
+    }
+
+    insertNewLine() {
+        this.vim.insertNewLine();
+
+        setTimeout(() => this.vim.switchModeTo(EDIT), 100);
+    }
+
+    /**
+     * Delete char(s) on and after cursor, or delete selection if active
+     * @param {number} repeatCount
+     */
+    delCharAfter(repeatCount) {
+        this.app.repeat(this.vim.deleteSelected, repeatCount);
         this.switchModeToGeneral();
     }
-};
 
-exports.copyCurrentLine = function(num) {
-    var _data = {p:undefined, t:''};
-    App.repeatAction(function () {
-        _data.t = vim.copyCurrentLine(_data.p);
-        _data.p = textUtil.getNextLineStart(_data.p);
-        return _data.t;
-    }, num);
-};
-
-exports.pasteAfter = function () {
-    if (App.clipboard !== undefined) {
-        if(vim.pasteInNewLineRequest){
-            var ep = textUtil.getCurrLineEndPos();
-            textUtil.appendText(_ENTER_ + App.clipboard, ep, true, true);
-        } else {
-            textUtil.appendText(App.clipboard, undefined, true, false)
-        }
+    backToHistory() {
+        const key = this.app.getEleKey();
+        const list = this.app.doList[key];
+        this.vim.backToHistory(list);
     }
-};
 
-exports.pasteBefore = function () {
-    if (App.clipboard !== undefined) {
-        if(vim.pasteInNewLineRequest){
-            var sp = textUtil.getCurrLineStartPos();
-            textUtil.insertText(App.clipboard + _ENTER_, sp, true, true);
-        } else {
-            textUtil.insertText(App.clipboard, undefined, true, false)
-        }
+    /**
+     *
+     * @param {number} repeatCount
+     */
+    delCurrLine(repeatCount) {
+        this.app.repeat(this.vim.delCurrLine, repeatCount);
     }
-};
 
-exports.moveToCurrentLineHead = function () {
-    vim.moveToCurrentLineHead();
-};
+    moveToFirstLine() {
+        this.vim.moveToFirstLine();
+    }
 
-exports.moveToCurrentLineTail = function () {
-    vim.moveToCurrentLineTail();
-};
+    moveToLastLine() {
+        this.vim.moveToLastLine();
+    }
 
-exports.replaceChar = function () {
-    vim.replaceRequest = true;
-};
+    moveToNextWord(repeatCount) {
+        this.app.repeat(this.vim.moveToNextWord, repeatCount);
+    }
 
-exports.appendNewLine = function () {
-    vim.appendNewLine();
-    setTimeout(function () {
-        vim.switchModeTo(EDIT);
-    }, 100);
-};
+    copyWord(repeatCount) {
+        this.vim.pasteInNewLineRequest = false;
 
-exports.insertNewLine = function () {
-    vim.insertNewLine();
-    setTimeout(function () {
-        vim.switchModeTo(EDIT);
-    }, 100);
-};
+        const start = this.textUtil.getCursorPosition();
+        const end = this.getCurrentWordEndPosition(repeatCount);
 
-exports.delCharAfter = function (num) {
-    App.repeatAction(function(){
-       return vim.deleteSelected();
-    }, num);
-    this.switchModeToGeneral()
-};
+        this.app.clipboard = this.textUtil.getText(start, end);
+    }
 
-exports.backToHistory = function () {
-    var key = App.getEleKey();
-    var list = App.doList[key];
-    vim.backToHistory(list);
-};
+    /**
+     *
+     * @param {number} repeatCount
+     * @returns {number|undefined}
+     */
+    getCurrentWordEndPosition(repeatCount) {
+        let end = undefined;
 
-exports.delCurrLine = function (num) {
-    App.repeatAction(function () {
-       return vim.delCurrLine();
-    }, num);
-};
+        this.app.repeat(() => {
+            end = this.vim.copyWord(end);
+        }, repeatCount);
 
-exports.moveToFirstLine = function () {
-    vim.moveToFirstLine();
-};
+        return end;
+    }
 
-exports.moveToLastLine = function () {
-    vim.moveToLastLine();
-};
+    deleteWord(repeatCount) {
+        this.vim.pasteInNewLineRequest = false;
+        this.app.repeat(this.vim.deleteWord, repeatCount);
+    }
 
-exports.moveToNextWord = function (num) {
-    App.repeatAction(function(){
-        vim.moveToNextWord();
-    }, num);
-};
-
-exports.copyWord = function (num) {
-    vim.pasteInNewLineRequest = false;
-    var sp = textUtil.getCursorPosition();
-    var ep;
-    App.repeatAction(function(){
-        ep = vim.copyWord(ep);
-    }, num);
-    App.clipboard = textUtil.getText(sp,ep);
-};
-
-exports.deleteWord = function (num) {
-    vim.pasteInNewLineRequest = false;
-    App.repeatAction(function () {
-       return vim.deleteWord();
-    }, num);
-};
+    /**
+     * @author rsenna
+     * Delete char before or current line, according to visual mode
+     */
+    shiftX() {
+        this.vim.pasteInNewLineRequest = false; // TODO: Why?
+        this.vim.delCurrentLineOrCharBefore()
+    }
+}

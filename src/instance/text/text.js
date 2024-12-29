@@ -1,309 +1,494 @@
 /**
  * Created by top on 15-9-6.
  */
-const _ENTER_ = '\n';
-var el;
 
-exports._init = function (element) {
-    el = element;
-}
+// TODO: move common constants elsewhere
+const ENTER = '\n';
+const ENTER_REGEXP = /\n/;
 
-exports.setEle = function(e){
-    el = e;
-}
+const charRegEx1 = /[\w\u4e00-\u9fa5]/;
+const charRegEx2 = /[^|]/;
 
-exports.getText = function(sp, ep) {
-    if (sp !== undefined || ep !== undefined) {
-        return el.value.slice(sp, ep);
-    }
-    return el.value;
-};
+const symbolRegEx1 = /\W/;
+const symbolRegEx2 = /\S/;
 
-exports.setText = function (t) {
-    el.value = t;
-};
+const findSymbolChar = /[^\w\u4e00-\u9fa5]/;
+const findGeneralChar = /[\w\u4e00-\u9fa5]/;
 
-exports.getSelectedText = function() {
-    //var t = document.getSelection() || document.selection.createRange().text;
-    var t;
-    if(document.selection){
-        t = document.selection.createRange().text;// for IE
-    } else {
-        t = el.value.substring(el.selectionStart, el.selectionEnd);
-    }
-    return t + '';
-};
+/**
+ * Text helper class
+ *
+ * @remarks
+ * There's considerable feature overlap between this class, {@Link Controller}, {@link Vim}
+ * @todo
+ * Refactor {@link TextUtil}, turn it into a simpler interface for supported element types
+ * @see {HTMLInputElement}
+ * @see {HTMLTextAreaElement}
+ */
+export class TextUtil {
+    /**
+     *
+     * @global
+     * @type {HTMLInputElement|HTMLTextAreaElement}
+     */
+    textElement;
 
-exports.getCursorPosition = function () {
-    if (document.selection) {
-        el.focus();
-        var ds = document.selection;
-        var range = ds.createRange();
-        var stored_range = range.duplicate();
-        stored_range.moveToElementText(el);
-        stored_range.setEndPoint("EndToEnd", range);
-        el.selectionStart = stored_range.text.length - range.text.length;
-        el.selectionEnd = el.selectionStart + range.text.length;
-        return el.selectionStart;
-    } else {
-        return el.selectionStart
+    /**
+     *
+     * @param {HTMLInputElement|HTMLTextAreaElement} element
+     * @returns {void}
+     */
+    _init(element) {
+        this.textElement = element;
+        document.selection = undefined;
     }
-};
 
-exports.getSelectEndPos = function () {
-    if (document.selection) {
-        el.focus();
-        var ds = document.selection;
-        var range = ds.createRange();
-        var stored_range = range.duplicate();
-        stored_range.moveToElementText(el);
-        stored_range.setEndPoint("EndToEnd", range);
-        el.selectionStart = stored_range.text.length - range.text.length;
-        el.selectionEnd = el.selectionStart + range.text.length;
-        return el.selectionEnd;
-    } else {
-        return el.selectionEnd;
+    /**
+     *
+     * @param {HTMLInputElement|HTMLTextAreaElement} element
+     * @returns {void}
+     */
+    /**
+     *
+     * @param {number} start
+     * @param {number} end
+     * @returns {string}
+     */
+    getText(start = -1, end = -1) {
+        return start === -1 || end === -1
+            ? this.textElement.value
+            : this.textElement.value.slice(start, end);
     }
-};
 
-exports.select = function (start, end) {
-    if (start > end) {
-        var p = start;
-        start = end;
-        end = p;
-    }
-    if (start < 0) {
-        start = 0;
-    }
-    if (end > this.getText().length) {
-        end = this.getText().length;
-    }
-    if(document.selection){
-        var range = el.createTextRange();
-        range.moveEnd('character', -el.value.length);
-        range.moveEnd('character', end);
-        range.moveStart('character', start);
-        range.select();
-    }else{
-        el.setSelectionRange(start, end);
-        el.focus();
-    }
-};
+    /**
+     *
+     * @param {string} text
+     * @returns {void}
+     */
+    setText(text) { this.textElement.value = text; }
 
-exports.appendText = function (t, p, paste, isNewLine) {
-    var ot = this.getText();
-    if (p === undefined) {
-        p = this.getCursorPosition() + 1;
+    /**
+     *
+     * @returns {string}
+     */
+    getSelectedText() {
+        const text = document.selection
+            ? document.selection.createRange().text
+            : this.textElement.value.substring(this.textElement.selectionStart, this.textElement.selectionEnd);
+
+        return text + '';
     }
-    var nt = ot.slice(0, p) + t + ot.slice(p, ot.length);
-    this.setText(nt);
-    if (paste) {
-        if (isNewLine && p) {
-            this.select(p+1, p+2);
+
+    /**
+     *
+     * @returns {number|null}
+     */
+    getCursorPosition() {
+        if (document.selection) {
+            this.textElement.focus();
+        }
+
+        return this.textElement.selectionStart;
+    }
+
+    /**
+     *
+     * @returns {number}
+     */
+    getSelectEndPos() {
+        if (document.selection) {
+            this.textElement.focus();
+        }
+
+        return this.textElement.selectionEnd;
+    }
+
+    /**
+     *
+     * @param {number} start
+     * @param {number} end
+     * @returns {void}
+     */
+    select(start, end) {
+        if (start > end) {
+            [start, end] = [end, start]; // Swap
+        }
+
+        const textLength = this.textElement.value.length; // Get the length of the input/textarea value
+
+        start = Math.max(0, start);
+        end = Math.min(textLength, end);
+
+        this.textElement.setSelectionRange(start, end);
+        this.textElement.focus();
+    }
+
+    /**
+     *
+     * @param {boolean} isAppend
+     * @param {string} text
+     * @param {number} position
+     * @param {boolean} paste
+     * @param {boolean} isNewLine
+     * @returns {void}
+     */
+    #insertAppendText(
+        isAppend,
+        text,
+        position,
+        paste,
+        isNewLine
+    ) {
+        const originalText = this.getText();
+
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        const newText =
+            originalText.slice(0, position) +
+            text +
+            originalText.slice(position, originalText.length);
+
+        this.setText(newText);
+
+        if (!paste) {
+            this.select(position, position + text.length);
+        } else if (isAppend && isNewLine && position) {
+            this.select(position + 1, position + 2);
+        } else if (!isAppend && isNewLine) {
+            this.select(position, position + 1);
         } else {
-            this.select(p+t.length, p+t.length-1);
+            this.select(position + text.length, position + text.length - 1);
         }
-    } else {
-        this.select(p, p + t.length);
-    }
-};
 
-exports.insertText = function (t, p, paste, isNewLine) {
-    var ot = this.getText();
-    if (p === undefined) {
-        p = this.getCursorPosition();
+        this.textElement.focus();
     }
-    var nt = ot.slice(0, p) + t + ot.slice(p, ot.length);
-    this.setText(nt);
-    if (paste) {
-        if (isNewLine) {
-            this.select(p, p+1);
-        } else {
-            this.select(p+t.length, p+t.length-1);
+
+    /**
+     *
+     * @param {string} text
+     * @param {number} position
+     * @param {boolean} paste
+     * @param {boolean} isNewLine
+     * @returns {void}
+     */
+    appendText(text, position, paste = false, isNewLine = false) {
+        this.#insertAppendText(true, text, position, paste, isNewLine);
+    }
+
+    /**
+     *
+     * @param {string} text
+     * @param {number} position
+     * @param {boolean} paste
+     * @param {boolean} isNewLine
+     * @returns {void}
+     */
+    insertText(text, position, paste = false, isNewLine = false) {
+        this.#insertAppendText(false, text, position, paste, isNewLine);
+    }
+
+    /**
+     *
+     * @param {number} start
+     * @param {number} end
+     * @returns {string|undefined}
+     */
+    deleteText(start, end) {
+        if (start > end) {
+            [start, end] = [end, start]; // Swap
         }
-    } else {
-        this.select(p, p + t.length);
-    }
-};
 
-exports.delete = function (sp, ep) {
-    if (sp > ep) {
-        var p = ep;
-        sp = ep;
-        ep = p;
-    }
-    if (ep - sp > 0) {
-        var t = this.getText();
-        var nt = t.slice(0, sp) + t.slice(ep);
-        if (!nt) {
-            nt = ' ';
+        if (end - start === 0) {
+            return undefined;
         }
-        this.setText(nt);
-        return t.slice(sp, ep);
-    }
-    return undefined;
-};
 
-exports.delSelected = function () {
-    var sp = this.getCursorPosition();
-    var ep = this.getSelectEndPos();
-    return this.delete(sp, ep);
-};
+        const text = this.getText();
+        const newText = text.slice(0, start) + text.slice(end) || ' ';
 
-exports.getCountFromStartToPosInCurrLine = function(p) {
-    if (p === undefined) {
-        p = this.getCursorPosition();
+        this.setText(newText);
+        return text.slice(start, end);
     }
-    var s = this.getCurrLineStartPos(p);
-    return (p - s) + 1;
-};
 
-exports.getCurrLineStartPos = function (p) {
-    if (p === undefined) {
-        p = this.getCursorPosition();
-    }
-    var sp = this.findSymbolBefore(p, _ENTER_);
-    return sp || 0;
-};
+    /**
+     *
+     * @returns {string|undefined}
+     */
+    delSelected() {
+        const start = this.getCursorPosition();
+        const end = this.getSelectEndPos();
 
-exports.getCurrLineEndPos = function (p) {
-    if (p === undefined) {
-        p = this.getCursorPosition();
+        return this.deleteText(start, end);
     }
-    if (this.getSymbol(p) == _ENTER_) {
-        return p;
-    }
-    var end = this.findSymbolAfter(p, _ENTER_);
-    return end || this.getText().length;
-};
 
-exports.getCurrLineCount = function (p) {
-    if (p === undefined) {
-        p = this.getCursorPosition();
-    }
-    var left = this.findSymbolBefore(p, _ENTER_);
-    var right = this.findSymbolAfter(p, _ENTER_);
-    if (left === undefined) {
-        return right;
-    }
-    return right - left;
-};
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number}
+     */
+    getCountFromStartToPosInCurrLine(position) {
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
 
-exports.getNextLineStart = function (p) {
-    var sp = this.getCurrLineStartPos(p);
-    var cc = this.getCurrLineCount(p);
-    return sp + cc + 1;
-};
+        const start = this.getCurrLineStartPos(position);
+        return position - start + 1;
+    }
 
-exports.getNextLineEnd = function (p) {
-    var start = this.getNextLineStart(p);
-    if (start !== undefined) {
-        var end = this.findSymbolAfter(start, _ENTER_);
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number}
+     */
+    getCurrLineStartPos(position = undefined) {
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        const start = this.findSymbolBefore(position, ENTER);
+        return start || 0;
+    }
+
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number}
+     */
+    getCurrLineEndPos(position = undefined) {
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        if (this.getSymbol(position) === ENTER) {
+            return position;
+        }
+
+        const end = this.findSymbolAfter(position, ENTER_REGEXP);
         return end || this.getText().length;
     }
-    return undefined;
-};
 
-exports.getPrevLineEnd = function (pos) {
-    var p = this.getCurrLineStartPos(pos);
-    if (p > 0) {
-        return p - 1;
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number}
+     */
+    getCurrLineCount(position = undefined) {
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        const left = this.findSymbolBefore(position, ENTER);
+        const right = this.findSymbolAfter(position, ENTER_REGEXP);
+
+        return left === undefined
+            ? right
+            : right - left;
     }
-    return undefined;
-};
 
-exports.getPrevLineStart = function (pos) {
-   var p = this.getPrevLineEnd(pos);
-   if (p !== undefined) {
-       var sp = this.findSymbolBefore(p, _ENTER_);
-       return sp || 0;
-   }
-   return undefined;
-};
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number}
+     */
+    getNextLineStart(position) {
+        const start = this.getCurrLineStartPos(position);
+        const count = this.getCurrLineCount(position);
 
-exports.findSymbolBefore = function (p, char) {
-    var text = this.getText();
-    for (var i = (p-1); i>=0; i--) {
-        if (text.charAt(i) == char) {
-            return i+1;
-        }
+        return start + count + 1;
     }
-    return 0;
-};
 
-exports.findSymbolAfter = function (p, char, char2) {
-    var text = this.getText();
-    var pattern = new RegExp(char);
-    //And conditions
-    var andPattern = char2 ? new RegExp(char2) : false;
-    for (var i = p; i<text.length; i++) {
-        if (pattern.test(text.charAt(i))) {
-            if (!andPattern) {
-                return i;
-            } else if (andPattern.test(text.charAt(i))) {
-                return i;
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number|undefined}
+     */
+    getNextLineEnd(position) {
+        const start = this.getNextLineStart(position);
+        if (start === undefined) { return undefined; }
+
+        const end = this.findSymbolAfter(start, ENTER_REGEXP);
+        return end || this.getText().length;
+    }
+
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number|undefined}
+     */
+    getPrevLineEnd(position) {
+        return this.getCurrLineStartPos(position) > 0
+            ? this.getCurrLineStartPos(position) - 1
+            : undefined;
+    }
+
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {number|undefined}
+     */
+    getPrevLineStart(position) {
+        position = this.getPrevLineEnd(position);
+        if (position === undefined) { return undefined; }
+
+        const start = this.findSymbolBefore(position, ENTER);
+        return start || 0;
+    }
+
+    /**
+     *
+     * @param {number} position
+     * @param {string} char
+     * @returns {number}
+     */
+    findSymbolBefore(position, char) {
+        const text = this.getText();
+
+        for (let i = position - 1; i >= 0; i--) {
+            if (text.charAt(i) === char) {
+                return i + 1;
             }
         }
-    }
-    return this.getText().length;
-};
 
-exports.getSymbol = function (p) {
-    var text = this.getText();
-    return text.charAt(p) || undefined;
-};
-
-exports.getNextSymbol = function (p) {
-    return this.getSymbol(p+1);
-};
-
-exports.getPrevSymbol = function (p) {
-    return this.getSymbol(p-1);
-};
-
-exports.getCurrWordPos = function (p) {
-    p = p || this.getCursorPosition();
-    //current character
-    var char = this.getSymbol(p);
-
-    //parse current character type
-    //
-    var patternStr;
-    if (/[\w\u4e00-\u9fa5]/.test(char) && /[^\|]/.test(char)) {
-        //this char is a general character(such as a-z,0-9,_, etc),
-        //and should find symbol character(such as *&^%$|{(, etc).
-        //
-        //pattern string for find symbol char:
-        patternStr = "[^\\w\u4e00-\u9fa5]";
-    } else if (/\W/.test(char) && /\S/.test(char)) {
-        //this char is a symbol character(such as *&^%$, etc),
-        //and should find general character(such as a-z,0-9,_, etc).
-        //
-        //pattern string for find general char:
-        patternStr = "[\\w\u4e00-\u9fa5]";
+        return 0;
     }
 
-    //parse and get current word`s last character`s right position,
-    //and in other word, get the next word`s first character`s left position
-    //
-    var lastCharPos;
-    if (patternStr) {
-        //get first invisible character position
-        var firstInvisible = this.findSymbolAfter(p, '\\s');
-        //get first visible character which after first invisible space
-        var firstVisible = this.findSymbolAfter(firstInvisible, '\\S');
-        //get position
-        lastCharPos = this.findSymbolAfter(p, patternStr, '\\S');
-        lastCharPos = lastCharPos - p < firstInvisible - p ? lastCharPos : firstVisible;
-    } else {
-        //get any visible symbol`s position
-        lastCharPos = this.findSymbolAfter(p, '\\S');
+    /**
+     *
+     * @param {number} position
+     * @param {RegExp} pattern
+     * @param {RegExp|undefined} andPattern
+     * @returns {number}
+     */
+    findSymbolAfter = (
+        position,
+        pattern,
+        andPattern = undefined
+    ) => {
+        const text = this.getText();
+
+        // And conditions
+        for (let i = position; i < text.length; i++) {
+            if (pattern.test(text.charAt(i))) {
+                if (!andPattern || andPattern.test(text.charAt(i))) {
+                    return i;
+                }
+
+            }
+        }
+
+        return text.length;
+    };
+
+    /**
+     *
+     * @param {number} position
+     * @returns {string|undefined}
+     */
+
+    getSymbol(position) {
+        const text = this.getText();
+        return text.charAt(position) || undefined;
     }
 
-    //return current word`s start position and end position
-    //
-    if (lastCharPos < this.getText().length) {
-        return [p, lastCharPos];
+    /**
+     *
+     * @param {number} position
+     * @returns {string|undefined}
+     */
+    getNextSymbol(position) {
+        return this.getSymbol(position + 1);
     }
-    return [p, undefined];
-};
+
+    /**
+     *
+     * @param {number} position
+     * @returns {string|undefined}
+     */
+    getPrevSymbol(position) {
+        return this.getSymbol(position - 1);
+    }
+
+    /**
+     *
+     * @param {string}char
+     * @returns {RegExp|undefined}
+     */
+    getCharType(char) {
+        if (charRegEx1.test(char) && charRegEx2.test(char)) {
+            // This char is a general character(such as a-z,0-9,_, etc),
+            // and should find symbol character(such as *&^%$|{(, etc).
+            return findSymbolChar;
+        }
+
+        if (symbolRegEx1.test(char) && symbolRegEx2.test(char)) {
+            //this char is a symbol character (such as *&^%$, etc),
+            //and should find general character (such as a-z,0-9,_, etc).
+            return findGeneralChar;
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Parse and get current word`s last character`s right position,
+     * and in other word, get the next word`s first character`s left position
+     * @param {RegExp|undefined} currentCharType
+     * @param {number} position
+     * @returns {number}
+     */
+    getLastCharPos(currentCharType, position) {
+        if (currentCharType) {
+            // Get first invisible character position
+            const firstInvisible = this.findSymbolAfter(position, /\s/);
+
+            // Get first visible character which after first invisible space
+            const firstVisible = this.findSymbolAfter(firstInvisible, /\S/);
+
+            // Get position
+            const lastCharPos = this.findSymbolAfter(position, currentCharType, /\S/);
+
+            return lastCharPos - position < firstInvisible - position
+                ? lastCharPos
+                : firstVisible;
+        }
+
+        // Get any visible symbol`s position
+        return this.findSymbolAfter(position, /\S/);
+    }
+
+    /**
+     *
+     * @param {number|undefined} position
+     * @returns {[number, number|undefined]}
+     */
+    getCurrWordPos(position = undefined) {
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        const currentChar = this.getSymbol(position);
+        const currentCharType = this.getCharType(currentChar);
+
+        let lastCharPos = this.getLastCharPos(currentCharType, position);
+        if (lastCharPos >= this.getText().length) {
+            lastCharPos = undefined;
+        }
+
+        return [position, lastCharPos];
+    }
+
+    /**
+     * @author rsenna
+     * Delete char before cursor
+     */
+    deleteCharBefore() {
+        const cursor = this.getCursorPosition();
+        const start = cursor === null || cursor <= 0
+            ? undefined
+            : cursor;
+        const end = start - 1;
+
+        return this.deleteText(start, end);
+    }
+}

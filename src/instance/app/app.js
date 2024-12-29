@@ -1,211 +1,330 @@
 /**
  * Created by top on 15-9-6.
  */
+import * as _ from '../../util/helper';
+import {Binder as bind} from '../../bind';
+import {Router} from '../router/router';
+import {TextUtil} from '../text/text';
+import {Vim} from '../vim/vim';
+import {Config} from '../../config';
+import {setupRoutes, setupRoutesEx} from '../../routes.js';
+
+// TODO: duplicated constants
 const GENERAL = 'general_mode';
-const VISUAL  = 'visual_mode';
-const _ENTER_ = '\n';
+const VISUAL = 'visual_mode';
+const ENTER = '\n';
 
-var _ = require('../../util/helper.js');
-var config = require('../../config.js');
-var routes = require('../../routes.js');
-var bind = require('../../bind.js');
-var extend = _.extend;
+export class App {
+    /**
+     * current element
+     * @type {undefined}
+     */
+    currentEle = undefined;
 
-exports.classes = {}
+    /**
+     * elements of vim.js app
+     * @type {Vim|undefined}
+     */
+    boxes = undefined;
 
-exports._init = function (options) {
-    extend(this, require('./init.js'));
+    /**
+     * app config
+     * @type {Config}
+     */
+    config = Config;
 
-    this.config = extend(config, options);
-    this.key_code_white_list = config.key_code_white_list;
+    /**
+     * Router instance
+     * @type {Router|undefined}
+     */
+    router = undefined;
 
-    this.router = this.createClass('Router');
-    this.textUtil = this.createClass('TextUtil', this.currentEle);
-    this.vim = this.createClass('Vim', this.textUtil);
-    this.controller = this.createClass('Controller', this);
+    /**
+     * Vim instance
+     * @type {Vim|undefined}
+     */
+    vim = undefined;
 
-    this._log(this);
-    this._start();
-}
+    /**
+     * TextUtil instance
+     * @type {TextUtil|undefined}
+     */
+    textUtil = undefined;
 
-exports._start = function () {
-    this._route();
-    this._bind();
-}
+    /**
+     * clipboard of app
+     * @type {undefined}
+     */
+    clipboard = undefined;
 
-exports._route = function () {
-    routes.ready(this.router);
-}
+    /**
+     * app do list
+     * @type {Array}
+     */
+    doList = [];
 
-exports._bind = function() {
-    bind.listen(this);
-}
+    /**
+     * app do list deep
+     * @type {number}
+     */
+    doListDeep = 100;
 
-exports._on = function (event, fn) {
-    if (!this._events) {
-        this._events = {}
+    /**
+     * previous key code
+     * @type {undefined}
+     */
+    prevCode = undefined;
+
+    /**
+     *
+     * @type {number}
+     */
+    prevCodeTime = 0;
+
+    /**
+     * numerical for vim command
+     * @type {string}
+     * @private
+     */
+    _number = '';
+
+    // TODO: try to remove
+    classes = [];
+
+    _init(options) {
+        this.config = new Config(options);
+
+        // TODO: review
+        this.router = this.createClass('Router');
+        this.textUtil = this.createClass('TextUtil', this.currentEle);
+        this.vim = this.createClass('Vim', this.textUtil);
+        this.controller = this.createClass('Controller', this);
+
+        this._log(this);
+        this._start();
     }
-    if (typeof  fn === 'function') {
-        this._events[event] = fn;
-    }
-    return this;
-}
 
-exports._fire = function (event) {
-    if (!this._events || !this._events[event]) {
-        return;
+    _start() {
+        this._route();
+        this._bind();
     }
-    var args = Array.prototype.slice.call(arguments, 1) || [];
-    var fn = this._events[event];
-    fn.apply(this, args);
-    return this;
-}
 
-exports._log = function(msg, debug) {
-    debug = debug ? debug : this.config.debug;
-    if (debug) {
-        console.log(msg)
-    }
-}
+    _route() { setupRoutesEx(this.router); }
 
-exports.repeatAction = function(action, num) {
-    if (typeof action !== 'function') {
-        return;
+    _bind() { bind.listen(this); }
+
+    _on(event, fn) {
+        if (!this._events) {
+            this._events = {};
+        }
+
+        if (typeof fn === 'function') {
+            this._events[event] = fn;
+        }
+
+        return this;
     }
-    var res = undefined;
-    if (num === undefined || isNaN(num)) {
-        num = 1;
+
+    _fire(event) {
+        if (!this._events || !this._events[event]) {
+            return;
+        }
+
+        const args = Array.prototype.slice.call(arguments, 1) || [];
+        const fn = this._events[event];
+
+        fn.apply(this, args);
+
+        return this;
     }
-    for (var i=0;i<num;i++) {
-        res = action.apply();
-        if (res) {
+
+    _log(message, debugOverride = false) {
+        const debug = debugOverride
+            ? debugOverride
+            : this.config.debug;
+
+        if (debug) {
+            console.log(message);
+        }
+    }
+
+    repeat(action, repeatCount) {
+        if (typeof action !== 'function') {
+            return;
+        }
+
+        if (repeatCount === undefined || isNaN(repeatCount)) {
+            repeatCount = 1;
+        }
+
+        let lastResult = undefined;
+
+        for (let i = 0; i < repeatCount; i++) {
+            lastResult = action.apply();
+
+            if (!lastResult) { continue; }
+
+            // TODO: Executed on first iteration only
             if (!i) {
                 this.clipboard = '';
             }
-            if (i == num-1) {
-                //remove line break char
-                res = res.replace(_ENTER_, '');
+
+            // TODO: Executed on last iteration only
+            if (i === repeatCount - 1) {
+                // Remove line break char
+                lastResult = lastResult.replace(ENTER, '');
             }
-            this.clipboard = this.clipboard + res;
+
+            this.clipboard = this.clipboard + lastResult;
         }
     }
-}
 
-exports.recordText = function(t, p) {
-    t = (t === undefined) ? this.textUtil.getText() : t;
-    p = (p === undefined) ? this.textUtil.getCursorPosition() : p;
-    var data = {
-        't':t,
-        'p':p
-    };
-    var key = this.getEleKey();
-    if (!this.doList[key]) {
-        this.doList[key] = [];
+    recordText(text, position) {
+        text = text === undefined
+            ? this.textUtil.getText()
+            : text;
+
+        position = position === undefined
+            ? this.textUtil.getCursorPosition()
+            : position;
+
+        const data = {
+            t: text,
+            p: position
+        };
+
+        const key = this.getEleKey();
+
+        if (!this.doList[key]) {
+            this.doList[key] = [];
+        }
+
+        if (this.doList[key].length >= this.doListDeep) {
+            this.doList[key].shift();
+        }
+
+        this.doList[key].push(data);
+        this._log(this.doList);
     }
-    if (this.doList[key].length >= this.doListDeep) {
-        this.doList[key].shift();
+
+    getEleKey() { return _.indexOf(this.boxes, this.currentEle); }
+
+    numberManager(code) {
+        if (code === 68 || code === 89) {
+            // Prevent numerical calculation errors when ndd and nyy, such as when code is 68，
+            // If it is not intercepted, initNumber() will be executed later, resulting in the inability to obtain the
+            // value during dd.
+            return undefined;
+        }
+
+        const charCode = parseInt(String.fromCharCode(code));
+
+        if (!isNaN(charCode) && charCode >= 0 && charCode <= 9) {
+            this._number = this._number + '' + charCode;
+            this._log('number:' + this._number);
+
+            return undefined;
+        }
+
+        const number = this._number;
+        this.initNumber();
+
+        return number
+            ? parseInt(number)
+            : undefined;
     }
-    this.doList[key].push(data);
-    this._log(this.doList);
-}
 
-exports.getEleKey = function() {
-    return _.indexOf(this.boxes, this.currentEle);
-}
+    initNumber() {
+        this._number = '';
+    }
 
-exports.numberManager = function(code) {
-    if (code == 68 || code == 89) {
-        //防止ndd和nyy时候数值计算错误,如当code为68时，
-        //如果不拦截，则会在后面执行initNumber()，导致dd时无法获取数值
+    isUnionCode(code, maxTime) {
+        if (maxTime === undefined) {
+            maxTime = 600;
+        }
+
+        const ct = _.currentTime();
+        const pt = this.prevCodeTime;
+        const pc = this.prevCode;
+
+        this.prevCode = code;
+        this.prevCodeTime = ct;
+
+        if (pc && (maxTime < 0 || ct - pt <= maxTime)) {
+            if (pc === code) {
+                this.prevCode = undefined;
+            }
+            return pc + '_' + code;
+        }
+
         return undefined;
     }
-    var num = String.fromCharCode(code);
-    if (!isNaN(num) && num >=0 && num <=9) {
-        this._number = this._number + '' + num;
-        this._log('number:' + this._number);
-    } else {
-        var n = this._number;
-        this.initNumber();
-        if (n) {
-            return parseInt(n);
+
+    parseRoute(code, event) {
+        const keybindings = this.router.keymap;
+
+        if (code === 27) {
+            this.controller.switchModeToGeneral();
+            return;
         }
-    }
-    return undefined;
-}
 
-exports.initNumber = function() {
-    this._number = '';
-}
-
-exports.isUnionCode = function (code, maxTime) {
-    if (maxTime === undefined) {
-        maxTime = 600;
-    }
-    var ct = _.currentTime();
-    var pt = this.prevCodeTime;
-    var pc = this.prevCode;
-    this.prevCode = code;
-    this.prevCodeTime = ct;
-    if (pc && (maxTime < 0 || ct - pt <= maxTime)) {
-        if (pc == code) {
-            this.prevCode = undefined;
+        if (!keybindings[code] || !this.vim.isMode(GENERAL) && !this.vim.isMode(VISUAL)) {
+            return;
         }
-        return pc + '_' + code;
-    }
-    return undefined;
-}
 
-exports.parseRoute = function(code, ev, num) {
-    var c = this.controller;
-    var param = num;
-    var prefix = 'c.';
-    var suffix = '(param)';
-    var vimKeys = this.router.getKeys();
-    if (code === 27) {
-        c.switchModeToGeneral();
-        return;
-    }
-    if (vimKeys[code] && (this.vim.isMode(GENERAL) || this.vim.isMode(VISUAL))) {
-        var mode = vimKeys[code]['mode'];
+        const mode = keybindings[code].mode;
+
         if (mode && !this.vim.isMode(mode)) {
             return false;
         }
-        var keyName = vimKeys[code]['name'];
-        if (ev.shiftKey) {
-            if (keyName == keyName.toUpperCase()) {
-                keyName = 'shift_' + keyName;
+
+        let keybindingName = keybindings[code].name;
+
+        if (event.shiftKey) {
+            if (keybindingName === keybindingName.toUpperCase()) {
+                keybindingName = 'shift_' + keybindingName;
             } else {
-                keyName = keyName.toUpperCase();
+                keybindingName = keybindingName.toUpperCase();
             }
         }
-        this._log(vimKeys[code][keyName] + suffix);
-        if (vimKeys[code][keyName]) {
-            //record
-            if (vimKeys[code]['record']) {
+
+        this._log(keybindings[code][keybindingName] + suffix);
+
+        if (keybindings[code][keybindingName]) {
+            // record
+            if (keybindings[code].record) {
                 this.recordText();
             }
-            eval(prefix + vimKeys[code][keyName] + suffix);
-            //init number
+
+            const _c = this.controller;
+            const prefix = '_c.';
+            const suffix = '(param)';
+            eval(prefix + keybindings[code][keybindingName] + suffix);
+
+            // init number
             this.initNumber();
         }
     }
-}
 
-exports.class = function (name, fn) {
-    if (!name) {
-        throw new Error('first param is required');
-    }
-    if (typeof fn !== 'function') {
-        throw new Error('second param must be a function');
-    }
-    this.classes[name] = fn;
-}
+    class(name, fn) {
+        if (!name) {
+            throw new Error('first param is required');
+        }
 
-exports.createClass = function(name, arg) {
-    var fn = this.classes[name];
-    if (typeof fn !== 'function') {
-        throw new Error('class '+name+' not define');
-    }
-    return new fn(arg);
-}
+        if (typeof fn !== 'function') {
+            throw new Error('second param must be a function');
+        }
 
+        this.classes[name] = fn;
+    }
+
+    createClass(name, arg) {
+        const fn = this.classes[name];
+
+        if (typeof fn !== 'function') {
+            throw new Error(`Class ${name} is not defined.`);
+        }
+
+        return new fn(arg);
+    }
+}

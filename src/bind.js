@@ -1,98 +1,121 @@
 /**
  * Created by top on 15-9-6.
  */
+
+import * as _ from './util/helper.js';
+import * as filter from './filter.js';
+
+// TODO: duplicated constants
 const GENERAL = 'general_mode';
-const VISUAL  = 'visual_mode';
+const VISUAL = 'visual_mode';
 
-var _ = require('./util/helper.js');
-var filter = require('./filter.js');
-var App;
+// TODO: static class
+export class Binder {
+    /**
+     * @type {App|undefined}
+     */
+    static #app = undefined;
 
-exports.listen = function(app) {
-    App = app;
-    var boxes = window.document.querySelectorAll('input, textarea');
-    App.boxes = boxes;
-    for (var i = 0; i<boxes.length;i++) {
-        var box = boxes[i];
-        box.onfocus = onFocus;
-        box.onclick = onClick;
-        box.onkeydown = onKeyDown;
-    }
-    App._on('reset_cursor_position', function (e) {
-        if (App.vim.isMode(GENERAL) || App.vim.isMode(VISUAL)) {
-            App.vim.resetCursorByMouse();
+    /**
+     *
+     * @param {App}app
+     */
+    static listen(app) {
+        Binder.#app = app;
+        const boxes = window.document.querySelectorAll('input, textarea');
+        Binder.#app.boxes = boxes;
+
+        for (let i = 0; i < boxes.length; i++) {
+            const box = boxes[i];
+
+            box.onfocus = Binder.onFocus;
+            box.onclick = Binder.onClick;
+            box.onkeydown = Binder.onKeyDown;
         }
-    });
-    App._on('input', function(ev, replaced){
-        var code = getCode(ev);
-        App._log('mode:'+App.vim.currentMode);
-        if (replaced) {
-            App.recordText();
+        Binder.#app._on('reset_cursor_position', function (_) {
+            if (Binder.#app.vim.isMode(GENERAL) || #app.vim.isMode(VISUAL)) {
+                Binder.#app.vim.resetCursorByMouse();
+            }
+        });
+        Binder.#app._on('input', function (ev, replaced) {
+            let code = Binder.getCode(ev);
+            Binder.#app._log('mode:' + Binder.#app.vim.currentMode);
+
+            if (replaced) {
+                Binder.#app.recordText();
+                return;
+            }
+
+            if (filter.code(Binder.#app, code)) {
+                const unionCode = Binder.#app.isUnionCode(code, -1);
+                const vimKeys = Binder.#app.router.keymap;
+
+                if (unionCode && vimKeys[unionCode]) {
+                    code = unionCode;
+                }
+
+                Binder.#app._log('key code:' + code);
+                const num = Binder.#app.numberManager(code);
+                Binder.#app.parseRoute(code, ev, num);
+            }
+        });
+    };
+
+    static onFocus() {
+        Binder.#app.currentEle = this;
+        Binder.#app.textUtil.setEle(this);
+        Binder.#app.vim.setTextUtil(Binder.#app.textUtil);
+        Binder.#app.vim.resetVim();
+        Binder.#app.controller.setVim(Binder.#app.vim);
+        Binder.#app.controller.setTextUtil(Binder.#app.textUtil);
+        Binder.#app.initNumber();
+    }
+
+    static onClick(e) {
+        const ev = e || event || window.event;
+        Binder.#app._fire('reset_cursor_position', ev);
+    }
+
+    static onKeyDown(e) {
+        let replaced = false;
+        const ev = Binder.getEvent(e);
+        const code = Binder.getCode(e);
+
+        if (_.indexOf(Binder.#app.config.key_code_white_list, code) !== -1) {
             return;
         }
-        if (filter.code(App, code)) {
-            var unionCode = App.isUnionCode(code, -1);
-            var vimKeys = App.router.getKeys();
-            if (unionCode && vimKeys[unionCode]) {
-                code = unionCode;
-            }
-            App._log('key code:'+code);
-            var num = App.numberManager(code);
-            App.parseRoute(code, ev, num);
-        }
-    });
-}
 
-function onFocus() {
-    App.currentEle = this;
-    App.textUtil.setEle(this);
-    App.vim.setTextUtil(App.textUtil);
-    App.vim.resetVim();
-    App.controller.setVim(App.vim);
-    App.controller.setTextUtil(App.textUtil);
-    App.initNumber();
-}
-
-function onClick(e) {
-    var ev = e || event || window.event;
-    App._fire('reset_cursor_position', ev);
-}
-
-function onKeyDown(e) {
-    var replaced = false;
-    var ev = getEvent(e);
-    var code = getCode(e);
-    if (_.indexOf(App.key_code_white_list, code) !== -1) {
-        return;
-    }
-    if (App.vim.isMode(GENERAL) || App.vim.isMode(VISUAL)) {
-        if (App.vim.replaceRequest) {
-            replaced = true;
-            App.vim.replaceRequest = false;
-            setTimeout(function () {
-                App.vim.selectPrevCharacter();
-            }, 50);
-        } else {
-            if (ev.preventDefault) {
+        if (Binder.#app.vim.isMode(GENERAL) || Binder.#app.vim.isMode(VISUAL)) {
+            if (Binder.#app.vim.replaceRequest) {
+                replaced = true;
+                Binder.#app.vim.replaceRequest = false;
+                setTimeout(function () {
+                    Binder.#app.vim.selectPrevCharacter();
+                }, 50);
+            } else if (ev.preventDefault) {
                 ev.preventDefault();
             } else {
                 ev.returnValue = false;
             }
+        } else if (code !== 27) {
+            const position = Binder.#app.textUtil.getCursorPosition();
+
+            let newPosition = position - 1 >= 0
+                ? position - 1
+                : position;
+
+            Binder.#app.recordText(undefined, newPosition);
         }
-    } else {
-        if(code != 27){
-            var p = App.textUtil.getCursorPosition();
-            App.recordText(undefined, (p-1>=0 ? p-1:p));
-        }
+
+        Binder.#app._fire('input', ev, replaced);
     }
-    App._fire('input', ev, replaced);
-}
 
-function getEvent(e) {
-    return e || event || window.event;
-}
+    static getEvent(e) {
+        return e || event || window.event;
+    }
 
-function getCode(ev) {
-    var e = getEvent(ev);
-    return e.keyCode || e.which || e.charCode;
+    static getCode(ev) {
+        const e = Binder.getEvent(ev);
+        return e.keyCode || e.which || e.charCode;
+    }
 }
