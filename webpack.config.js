@@ -5,7 +5,7 @@ module.exports = {
     },
     output: {
         path: path.resolve("./build"),
-        filename: "vim.js",
+        filename: "vim_editor.js",
         publicPath: "/build"
     },
     devtool: '#source-map'

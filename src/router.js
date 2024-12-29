@@ -2,8 +2,7 @@
  * Created by top on 15-9-6.
  */
 
-import {Controller} from '../controller';
-import {code} from '../../filter';
+import {Controller} from './controller';
 
 class RouterItem {
     /**
@@ -25,7 +24,6 @@ class RouterItem {
      * @type {Function<Controller>}
      */
     #action = undefined;
-
 
     get name() { return this.#name; }
     set name(value) { this.#name = value; }
@@ -59,7 +57,7 @@ export class Router {
     /**
      * Retrieves the current keymapping, associating key-codes and behaviour
      *
-     * @returns {Object<string, RouterItem>}
+     * @return {Object<string, RouterItem>}
      */
     get keymap() { return this.#keymap; }
 
@@ -104,6 +102,7 @@ export class Router {
      * @param {string} codeName - The name to associate with the method.
      * @param {string} methodName - The method name to be registered.
      * @return {Router|undefined} The instance of the class for chaining method calls.
+     * @deprecated
      */
     action(codeName, methodName) {
         if (!this.#currentCodeNumber) {
@@ -112,7 +111,7 @@ export class Router {
 
         // TODO: This takes a `RouterItem` with the `#currentCodeNumber`, and then
         //       **adds a new property `codeName`** to it, containing the `methodName`!
-        //       very cumbersome and not very practical... (but it works)
+        //       very cumbersome and not very practical... (but it seems to work)
         this.#keymap[this.#currentCodeNumber][codeName] = methodName;
         return this;
     }
@@ -169,7 +168,7 @@ export class Router {
      * @param {function} record
      * @param {function} before
      * @param {function} after
-     * @returns void
+     * @return void
      */
     executeActionEx(code, key, record = undefined, before = undefined, after = undefined) {
         if (before && typeof before === 'function') {
@@ -182,9 +181,6 @@ export class Router {
             if (record && typeof record === 'function' && routerItem.record) {
                 record();
             }
-
-            const prefix = 'controller.';
-            const suffix = '(param)';
 
             if (routerItem.action && typeof routerItem.action === 'function') {
                 routerItem.action.call(this.#controller);

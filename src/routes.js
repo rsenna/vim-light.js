@@ -17,7 +17,7 @@ export function setupRoutes(router) {
     router.code(46, 'Delete').action('Delete', 'delCharAfter').record(true);
 
     // ---------------------------
-    // Vim feature keys
+    // VimEditor feature keys
     // ---------------------------
 
     // 0:move to current line head
@@ -113,7 +113,7 @@ export function setupRoutesEx(router) {
     router.code(46, 'Delete').actionEx('Delete', c => c.delCharAfter).record(true);
 
     // ---------------------------
-    // Vim feature keys
+    // VimEditor feature keys
     // ---------------------------
 
     // 0:move to current line head

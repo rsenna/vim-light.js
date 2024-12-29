@@ -1,25 +1,19 @@
 /**
  * Created by top on 15-9-6.
  */
-import { App } from 'instance/app/app';
-
-const GENERAL = 'general_mode';
-const COMMAND = 'command_mode';
-const EDIT    = 'edit_mode';
-const VISUAL  = 'visual_mode';
-
-const errorMessage = 'Execution failure! Please use the vim instructions in the English input method.';
+import {Application} from 'src/application';
+import {ERROR_MESSAGE, GENERAL, VISUAL} from './consts';
 
 /**
  *
- * @param {App}app
+ * @param {Application}application
  * @param {number}code
- * @returns {boolean}
+ * @return {boolean}
  */
-export const code = (app, code) => {
-    if (code === 229 && (app.vim.isMode(GENERAL) || app.vim.isMode(VISUAL))) {
-        app._log(errorMessage);
-        app.config.showMsg(errorMessage);
+export const code = (application, code) => {
+    if (code === 229 && (application.#vim.isMode(GENERAL) || application.#vim.isMode(VISUAL))) {
+        application.log(ERROR_MESSAGE);
+        application.#config.showMsg(ERROR_MESSAGE);
 
         return false;
     }

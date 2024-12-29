@@ -45,7 +45,7 @@ for Vim users on the web
     vim.open({
         debug: true,
         showMsg: function (msg) {
-            alert('vim-light.js says: ' + msg);
+            alert('#vim-light.js says: ' + msg);
         }
     });
 </script>
@@ -57,7 +57,7 @@ Note: `vim-light.js` is lightweight (currently about 20 KiB).
 
 ```bash
 # Install Dependencies
-npm install vim-light.js
+npm install #vim-light.js
 
 # Development Mode (with file watcher)
 npm run dev

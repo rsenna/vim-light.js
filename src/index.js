@@ -1,60 +1,24 @@
-import * as _ from 'util/helper';
-import { Router } from 'instance/router/router'
+import * as _ from 'src/helper';
+import { Application } from 'src/application';
+import { Controller } from 'src/controller';
+import { Router } from 'src/router'
+import { TextUtil } from 'src/text_util';
+import { VimEditor } from 'src/vim_editor';
 
-/**
- * Vim constructor
- * @constructor
- */
-function Vim(textUtil) {
-    this._init(textUtil);
+const init = () => {
+    const Application = new Application(undefined, undefined, undefined);
+
 }
 
-let prototype = Vim.prototype;
-_.extend(prototype, require('./instance/vim/vim.js'));
+
+
 
 /**
- * textUtil constructor
- * @constructor
- */
-function TextUtil(element) {
-    this._init(element);
-}
-
-let prototype = TextUtil.prototype;
-_.extend(prototype, require('./instance/text/text.js'));
-
-/**
- *
- * @constructor
- */
-function Controller(app) {
-    this._init(app);
-}
-
-let prototype = Controller.prototype;
-_.extend(prototype, require('./instance/controller.js'));
-
-/**
- * App constructor
- * @constructor
- */
-function App(options) {
-    this._init(options);
-}
-
-let prototype = App.prototype;
-_.extend(prototype, require('./instance/app/app.js'));
-prototype.class('Router', Router);
-prototype.class('Vim', Vim);
-prototype.class('TextUtil', TextUtil);
-prototype.class('Controller', Controller);
-
-/**
- * define vim
+ * define #vim
  * @type {{open: Function}}
  */
 window.vim = {
     open: function (options) {
-        return new App(options);
+        return new Application(undefined, options, undefined, undefined, undefined, undefined);
     }
 };

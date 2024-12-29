@@ -2,24 +2,14 @@
  * Created by top on 15-9-6.
  */
 
-// TODO: move common constants elsewhere
-const ENTER = '\n';
-const ENTER_REGEXP = /\n/;
-
-const charRegEx1 = /[\w\u4e00-\u9fa5]/;
-const charRegEx2 = /[^|]/;
-
-const symbolRegEx1 = /\W/;
-const symbolRegEx2 = /\S/;
-
-const findSymbolChar = /[^\w\u4e00-\u9fa5]/;
-const findGeneralChar = /[\w\u4e00-\u9fa5]/;
+import {VimEditor} from './vim_editor';
+import * as consts from './consts';
 
 /**
  * Text helper class
  *
  * @remarks
- * There's considerable feature overlap between this class, {@Link Controller}, {@link Vim}
+ * There's considerable feature overlap between this class, {@Link Controller}, {@link VimEditor}
  * @todo
  * Refactor {@link TextUtil}, turn it into a simpler interface for supported element types
  * @see {HTMLInputElement}
@@ -36,7 +26,7 @@ export class TextUtil {
     /**
      *
      * @param {HTMLInputElement|HTMLTextAreaElement} element
-     * @returns {void}
+     * @return {void}
      */
     _init(element) {
         this.textElement = element;
@@ -46,13 +36,13 @@ export class TextUtil {
     /**
      *
      * @param {HTMLInputElement|HTMLTextAreaElement} element
-     * @returns {void}
+     * @return {void}
      */
     /**
      *
      * @param {number} start
      * @param {number} end
-     * @returns {string}
+     * @return {string}
      */
     getText(start = -1, end = -1) {
         return start === -1 || end === -1
@@ -63,13 +53,13 @@ export class TextUtil {
     /**
      *
      * @param {string} text
-     * @returns {void}
+     * @return {void}
      */
     setText(text) { this.textElement.value = text; }
 
     /**
      *
-     * @returns {string}
+     * @return {string}
      */
     getSelectedText() {
         const text = document.selection
@@ -81,7 +71,7 @@ export class TextUtil {
 
     /**
      *
-     * @returns {number|null}
+     * @return {number|null}
      */
     getCursorPosition() {
         if (document.selection) {
@@ -93,7 +83,7 @@ export class TextUtil {
 
     /**
      *
-     * @returns {number}
+     * @return {number}
      */
     getSelectEndPos() {
         if (document.selection) {
@@ -107,7 +97,7 @@ export class TextUtil {
      *
      * @param {number} start
      * @param {number} end
-     * @returns {void}
+     * @return {void}
      */
     select(start, end) {
         if (start > end) {
@@ -130,7 +120,7 @@ export class TextUtil {
      * @param {number} position
      * @param {boolean} paste
      * @param {boolean} isNewLine
-     * @returns {void}
+     * @return {void}
      */
     #insertAppendText(
         isAppend,
@@ -171,7 +161,7 @@ export class TextUtil {
      * @param {number} position
      * @param {boolean} paste
      * @param {boolean} isNewLine
-     * @returns {void}
+     * @return {void}
      */
     appendText(text, position, paste = false, isNewLine = false) {
         this.#insertAppendText(true, text, position, paste, isNewLine);
@@ -183,7 +173,7 @@ export class TextUtil {
      * @param {number} position
      * @param {boolean} paste
      * @param {boolean} isNewLine
-     * @returns {void}
+     * @return {void}
      */
     insertText(text, position, paste = false, isNewLine = false) {
         this.#insertAppendText(false, text, position, paste, isNewLine);
@@ -193,7 +183,7 @@ export class TextUtil {
      *
      * @param {number} start
      * @param {number} end
-     * @returns {string|undefined}
+     * @return {string|undefined}
      */
     deleteText(start, end) {
         if (start > end) {
@@ -213,7 +203,7 @@ export class TextUtil {
 
     /**
      *
-     * @returns {string|undefined}
+     * @return {string|undefined}
      */
     delSelected() {
         const start = this.getCursorPosition();
@@ -225,7 +215,7 @@ export class TextUtil {
     /**
      *
      * @param {number|undefined} position
-     * @returns {number}
+     * @return {number}
      */
     getCountFromStartToPosInCurrLine(position) {
         position = position === undefined
@@ -239,47 +229,47 @@ export class TextUtil {
     /**
      *
      * @param {number|undefined} position
-     * @returns {number}
+     * @return {number}
      */
     getCurrLineStartPos(position = undefined) {
         position = position === undefined
             ? this.getCursorPosition()
             : position;
 
-        const start = this.findSymbolBefore(position, ENTER);
+        const start = this.findSymbolBefore(position, consts.ENTER);
         return start || 0;
     }
 
     /**
      *
      * @param {number|undefined} position
-     * @returns {number}
+     * @return {number}
      */
     getCurrLineEndPos(position = undefined) {
         position = position === undefined
             ? this.getCursorPosition()
             : position;
 
-        if (this.getSymbol(position) === ENTER) {
+        if (this.getSymbol(position) === consts.ENTER) {
             return position;
         }
 
-        const end = this.findSymbolAfter(position, ENTER_REGEXP);
+        const end = this.findSymbolAfter(position, consts.ENTER_REGEXP);
         return end || this.getText().length;
     }
 
     /**
      *
      * @param {number|undefined} position
-     * @returns {number}
+     * @return {number}
      */
     getCurrLineCount(position = undefined) {
         position = position === undefined
             ? this.getCursorPosition()
             : position;
 
-        const left = this.findSymbolBefore(position, ENTER);
-        const right = this.findSymbolAfter(position, ENTER_REGEXP);
+        const left = this.findSymbolBefore(position, consts.ENTER);
+        const right = this.findSymbolAfter(position, consts.ENTER_REGEXP);
 
         return left === undefined
             ? right
@@ -289,7 +279,7 @@ export class TextUtil {
     /**
      *
      * @param {number|undefined} position
-     * @returns {number}
+     * @return {number}
      */
     getNextLineStart(position) {
         const start = this.getCurrLineStartPos(position);
@@ -301,20 +291,20 @@ export class TextUtil {
     /**
      *
      * @param {number|undefined} position
-     * @returns {number|undefined}
+     * @return {number|undefined}
      */
     getNextLineEnd(position) {
         const start = this.getNextLineStart(position);
         if (start === undefined) { return undefined; }
 
-        const end = this.findSymbolAfter(start, ENTER_REGEXP);
+        const end = this.findSymbolAfter(start, consts.ENTER_REGEXP);
         return end || this.getText().length;
     }
 
     /**
      *
      * @param {number|undefined} position
-     * @returns {number|undefined}
+     * @return {number|undefined}
      */
     getPrevLineEnd(position) {
         return this.getCurrLineStartPos(position) > 0
@@ -325,13 +315,13 @@ export class TextUtil {
     /**
      *
      * @param {number|undefined} position
-     * @returns {number|undefined}
+     * @return {number|undefined}
      */
     getPrevLineStart(position) {
         position = this.getPrevLineEnd(position);
         if (position === undefined) { return undefined; }
 
-        const start = this.findSymbolBefore(position, ENTER);
+        const start = this.findSymbolBefore(position, consts.ENTER);
         return start || 0;
     }
 
@@ -339,7 +329,7 @@ export class TextUtil {
      *
      * @param {number} position
      * @param {string} char
-     * @returns {number}
+     * @return {number}
      */
     findSymbolBefore(position, char) {
         const text = this.getText();
@@ -358,7 +348,7 @@ export class TextUtil {
      * @param {number} position
      * @param {RegExp} pattern
      * @param {RegExp|undefined} andPattern
-     * @returns {number}
+     * @return {number}
      */
     findSymbolAfter = (
         position,
@@ -383,7 +373,7 @@ export class TextUtil {
     /**
      *
      * @param {number} position
-     * @returns {string|undefined}
+     * @return {string|undefined}
      */
 
     getSymbol(position) {
@@ -394,7 +384,7 @@ export class TextUtil {
     /**
      *
      * @param {number} position
-     * @returns {string|undefined}
+     * @return {string|undefined}
      */
     getNextSymbol(position) {
         return this.getSymbol(position + 1);
@@ -403,7 +393,7 @@ export class TextUtil {
     /**
      *
      * @param {number} position
-     * @returns {string|undefined}
+     * @return {string|undefined}
      */
     getPrevSymbol(position) {
         return this.getSymbol(position - 1);
@@ -412,19 +402,19 @@ export class TextUtil {
     /**
      *
      * @param {string}char
-     * @returns {RegExp|undefined}
+     * @return {RegExp|undefined}
      */
     getCharType(char) {
-        if (charRegEx1.test(char) && charRegEx2.test(char)) {
+        if (consts.charRegEx1.test(char) && consts.charRegEx2.test(char)) {
             // This char is a general character(such as a-z,0-9,_, etc),
             // and should find symbol character(such as *&^%$|{(, etc).
-            return findSymbolChar;
+            return consts.findSymbolChar;
         }
 
-        if (symbolRegEx1.test(char) && symbolRegEx2.test(char)) {
+        if (consts.symbolRegEx1.test(char) && consts.symbolRegEx2.test(char)) {
             //this char is a symbol character (such as *&^%$, etc),
             //and should find general character (such as a-z,0-9,_, etc).
-            return findGeneralChar;
+            return consts.findGeneralChar;
         }
 
         return undefined;
@@ -435,7 +425,7 @@ export class TextUtil {
      * and in other word, get the next word`s first character`s left position
      * @param {RegExp|undefined} currentCharType
      * @param {number} position
-     * @returns {number}
+     * @return {number}
      */
     getLastCharPos(currentCharType, position) {
         if (currentCharType) {
@@ -460,7 +450,7 @@ export class TextUtil {
     /**
      *
      * @param {number|undefined} position
-     * @returns {[number, number|undefined]}
+     * @return {[number, number|undefined]}
      */
     getCurrWordPos(position = undefined) {
         position = position === undefined

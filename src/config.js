@@ -10,13 +10,17 @@ export class Config {
     }
 
     /**
-     * Vim key codes whitelist
-     * @type {Array}
+     * VimEditor key codes whitelist
+     * @type {Array<number>}
      */
     key_code_white_list = [
         9, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123
     ];
 
+    /**
+     *
+     * @param {Object} options
+     */
     constructor(options) {
         Object.assign(this, options);
     }

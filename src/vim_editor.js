@@ -2,17 +2,12 @@
  * Created by top on 15-9-6.
  */
 
-import {TextUtil} from '../text/text';
-
-// TODO: duplicated constants
-const GENERAL = 'general_mode';
-const COMMAND = 'command_mode';
-const EDIT = 'edit_mode';
-const VISUAL = 'visual_mode';
-const ENTER = '\n';
+import {TextUtil} from './text_util';
+import {Data} from './controller';
+import {COMMAND, EDIT, ENTER, GENERAL, VISUAL} from './consts';
 
 /**
- * Represents a Vim editor, bound to a text element in the current page
+ * Represents a Vim Editor, bound to text elements in a web page
  * @remarks
  * Terminology should be changed, to reflect {@link https://www.vim.org/|Vim} documentation,
  * and to help distinguishing between this class and {@link TextUtil}
@@ -22,7 +17,7 @@ const ENTER = '\n';
  * @see {HTMLInputElement}
  * @see {HTMLTextAreaElement}
  */
-export class Vim {
+export class VimEditor {
     /**
      * default mode
      * @type {string}
@@ -76,8 +71,8 @@ export class Vim {
 
     /**
      *
-     * @param modeName
-     * @returns {boolean}
+     * @param {string} modeName
+     * @return {boolean}
      * @todo Use [rest parameter syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters)
      *       So it can receive multiple modes (to be tested with `or` logic,
      *       of course)
@@ -89,7 +84,7 @@ export class Vim {
     static modeNames = [GENERAL, COMMAND, EDIT, VISUAL];
 
     switchModeTo(modeName) {
-        if (Vim.modeNames.indexOf(modeName) > -1) {
+        if (VimEditor.modeNames.indexOf(modeName) > -1) {
             this.currentMode = modeName;
         }
     }
@@ -117,7 +112,7 @@ export class Vim {
     /**
      * Helper for {@link selectNextCharacter}
      *
-     * @returns {number|undefined}
+     * @return {number|undefined}
      * @private
      */
     #getCursorPosition() {
@@ -189,7 +184,7 @@ export class Vim {
      * Helper for {@link selectPrevCharacter}
      *
      * @param position
-     * @returns {[number|undefined, number]} `[start, new-position]` tuple,
+     * @return {[number|undefined, number]} `[start, new-position]` tuple,
      * representing the updated visual selection coordinates
      * @private
      */
@@ -437,7 +432,7 @@ export class Vim {
      * If there's no selection, delete char before cursor
      * If selection is active, **delete whole line**
      * @remarks
-     * That's the default behaviour of `S-X` on Vim/Neovim
+     * That's the default behaviour of `S-X` on VimEditor/Neovim
      */
     delCurrentLineOrCharBefore() {
         if (this.isMode(VISUAL)) {
@@ -457,14 +452,18 @@ export class Vim {
         return this.textUtil.getText(start, end + 1);
     }
 
+    /**
+     *
+     * @param {Array<Data>} list
+     */
     backToHistory(list) {
         if (!list) { return; }
 
         const data = list.pop();
         if (data === undefined) { return; }
 
-        this.textUtil.setText(data.t);
-        this.textUtil.select(data.p, data.p + 1);
+        this.textUtil.setText(data.text);
+        this.textUtil.select(data.position, data.position + 1);
     }
 
     delCurrLine() {
