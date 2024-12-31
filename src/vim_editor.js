@@ -1,72 +1,62 @@
-/**
- * Created by top on 15-9-6.
- */
-
-import {TextUtil} from './text_util';
-import {Data} from './controller';
-import {COMMAND, EDIT, ENTER, GENERAL, VISUAL} from './consts';
+import {HTMLEditorBuffer} from './html_editor_buffer';
+import {UndoItem} from './vim_controller';
+import {COMMAND, EDIT, ENTER, GENERAL, VISUAL} from './globals';
 
 /**
- * Represents a Vim Editor, bound to text elements in a web page
+ * Represents a Vim Editor, bound to a {@link HTMLEditorBuffer}
  * @remarks
  * Terminology should be changed, to reflect {@link https://www.vim.org/|Vim} documentation,
- * and to help distinguishing between this class and {@link TextUtil}
+ * and to help distinguishing between this class and {@link HTMLEditorBuffer}
  * @example
  * `Yank` instead of `Paste`
- * @see {TextUtil}
+ * @see {HTMLEditorBuffer}
  * @see {HTMLInputElement}
  * @see {HTMLTextAreaElement}
  */
 export class VimEditor {
-    /**
-     * default mode
-     * @type {string}
-     */
-    currentMode = 'edit_mode';
-
-    /**
-     * Whether there has been a request to replace a character
-     * @type {boolean}
-     */
-    replaceRequest = false;
-
-    /**
-     * Whether there has been a request to paste a new line
-     * TODO: not sure what this is for
-     * @type {boolean}
-     */
-    pasteInNewLineRequest = false;
+    /** @type {string} */
+    #currentMode = EDIT;
 
     /**
      * The starting position of selected text (visual mode)
-     * @type {number|undefined}
+     * @type {number}
      */
-    visualStart = undefined;
+    #visualStart = undefined;
 
     /**
      * The end position of selected text (visual mode)
-     * @type {number|undefined}
+     * @type {number}
      */
-    visualCursor = undefined;
+    #visualCursor = undefined;
 
-    /**
-     * A reference to {@link TextUtil} dependency
-     * @type {TextUtil}
-     */
-    textUtil = undefined;
+    /** @type {HTMLEditorBuffer} */
+    #htmlEditorBuffer = undefined;
+
+    /** @type {boolean} */
+    #replaceCharRequested = false;
+
+    /** @type {boolean} */
+    #pasteNewLineRequested = false;
+
+    // TODO: remove property setters (state should not be changed like that)
+
+    get currentMode() { return this.#currentMode; }
+
+    // unused: get htmlEditorBuffer() { return this.#htmlEditorBuffer; }
+    set htmlEditorBuffer(value) { this.#htmlEditorBuffer = value; }
+
+    get visualCursor() { return this.#visualCursor; }
+    get visualStart() { return this.#visualStart; }
+
+    get replaceCharRequested() { return this.#replaceCharRequested; }
+    set replaceCharRequested(value) { this.#replaceCharRequested = value; }
+
+    get pasteNewLineRequested() { return this.#pasteNewLineRequested; }
+    set pasteNewLineRequested(value) { return this.#pasteNewLineRequested = value; }
 
     resetVim() {
-        this.replaceRequest = false;
-        this.visualStart = undefined;
-        this.visualCursor = undefined;
-    }
-
-    /**
-     *
-     * @param {TextUtil}textUtil1
-     */
-    setTextUtil(textUtil1) {
-        this.textUtil = textUtil1;
+        this.#visualStart = undefined;
+        this.#visualCursor = undefined;
     }
 
     /**
@@ -78,35 +68,40 @@ export class VimEditor {
      *       of course)
      */
     isMode(modeName) {
-        return this.currentMode === modeName;
+        return this.#currentMode === modeName;
     }
 
     static modeNames = [GENERAL, COMMAND, EDIT, VISUAL];
 
     switchModeTo(modeName) {
         if (VimEditor.modeNames.indexOf(modeName) > -1) {
-            this.currentMode = modeName;
+            this.#currentMode = modeName;
         }
     }
 
     resetCursorByMouse() {
         this.switchModeTo(GENERAL);
 
-        const position = this.textUtil.getCursorPosition();
-        const start = this.textUtil.getCurrLineStartPos();
-        const count = this.textUtil.getCurrLineCount();
+        const position = this.#htmlEditorBuffer.getCursorPosition();
+        const start = this.#htmlEditorBuffer.getLineStart();
+        const count = this.#htmlEditorBuffer.getLineLength();
 
         if (position === start && !count) {
-            this.textUtil.appendText(' ', position);
+            this.#htmlEditorBuffer.insertAtLineEnd(' ', position);
         }
 
-        const ns = this.textUtil.getNextSymbol(position - 1);
+        const nextSymbol = this.#htmlEditorBuffer.getCharAfter(position - 1);
 
-        if (!ns || ns === ENTER) {
-            this.textUtil.select(position - 1, position);
+        if (!nextSymbol || nextSymbol === ENTER) {
+            this.#htmlEditorBuffer.select(position - 1, position);
         } else {
-            this.textUtil.select(position, position + 1);
+            this.#htmlEditorBuffer.select(position, position + 1);
         }
+    }
+
+    resetVisualMode() {
+        this.#visualStart = this.#htmlEditorBuffer.getCursorPosition();
+        this.#visualCursor = undefined;
     }
 
     /**
@@ -116,21 +111,19 @@ export class VimEditor {
      * @private
      */
     #getCursorPosition() {
-        let position = this.textUtil.getCursorPosition();
+        const position = this.isMode(VISUAL) && this.#visualCursor !== undefined
+            ? this.#visualCursor
+            : this.#htmlEditorBuffer.getCursorPosition();
 
-        if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-            position = this.visualCursor;
-        }
-
-        if (this.isMode(GENERAL) && this.textUtil.getNextSymbol(position) === ENTER) {
+        if (this.isMode(GENERAL) && this.#htmlEditorBuffer.getCharAfter(position) === ENTER) {
             return undefined;
         }
 
-        if (this.isMode(VISUAL) && this.textUtil.getNextSymbol(position - 1) === ENTER) {
+        if (this.isMode(VISUAL) && this.#htmlEditorBuffer.getCharAfter(position - 1) === ENTER) {
             return undefined;
         }
 
-        if (position + 1 > this.textUtil.getText().length) {
+        if (position + 1 > this.#htmlEditorBuffer.text.length) {
             return undefined;
         }
 
@@ -150,33 +143,31 @@ export class VimEditor {
         let lastCursorPosition = undefined;
 
         if (this.isMode(VISUAL)) {
-            start = this.visualStart;
-            this.visualCursor = position + 1;
-
-            lastVisualCursor = this.visualCursor;
-            lastVisualStart = this.visualStart;
-            lastCursorPosition = this.textUtil.getCursorPosition();
+            start = this.#visualStart;
+            lastVisualCursor = this.#visualCursor = position + 1;
+            lastVisualStart = this.#visualStart;
+            lastCursorPosition = this.#htmlEditorBuffer.getCursorPosition();
         }
 
-        this.textUtil.select(start, position + 2);
+        this.#htmlEditorBuffer.select(start, position + 2);
 
         if (!this.isMode(VISUAL)) {
             return;
         }
 
         if (start === position) {
-            this.textUtil.select(start, position + 2);
-            this.visualCursor = position + 2;
+            this.#htmlEditorBuffer.select(start, position + 2);
+            this.#visualCursor = position + 2;
         } else {
-            this.textUtil.select(start, position + 1);
+            this.#htmlEditorBuffer.select(start, position + 1);
         }
 
         if (lastVisualStart > lastVisualCursor && lastVisualStart > lastCursorPosition) {
-            this.textUtil.select(start, position + 1);
+            this.#htmlEditorBuffer.select(start, position + 1);
         } else if (lastVisualCursor === lastVisualStart && lastVisualStart - lastCursorPosition === 1) {
-            this.visualStart = lastVisualStart - 1;
-            this.visualCursor = position + 2;
-            this.textUtil.select(start - 1, position + 2);
+            this.#visualStart = lastVisualStart - 1;
+            this.#visualCursor = position + 2;
+            this.#htmlEditorBuffer.select(start - 1, position + 2);
         }
     }
 
@@ -193,41 +184,41 @@ export class VimEditor {
             return [position - 1, position];
         }
 
-        let start = this.visualStart;
+        let start = this.#visualStart;
 
-        if (position > start && this.textUtil.getPrevSymbol(position - 1) === ENTER) {
+        if (position > start && this.#htmlEditorBuffer.getCharBefore(position - 1) === ENTER) {
             return [undefined, position];
         }
 
         if (position === start) {
-            this.visualStart = ++position;
-            this.visualCursor = --start;
+            this.#visualStart = ++position;
+            this.#visualCursor = --start;
 
         } else if (position === start + 1) {
-            this.visualStart = ++start;
-            this.visualCursor = (position -= 2);
+            this.#visualStart = ++start;
+            this.#visualCursor = (position -= 2);
 
         } else if (position === start - 1) {
-            this.visualCursor = position = start - 2;
+            this.#visualCursor = position = start - 2;
 
-        } else if (position > start && position === this.textUtil.getSelectEndPos() - 1) {
-            this.visualCursor = position;
+        } else if (position > start && position === this.#htmlEditorBuffer.getSelectionEnd() - 1) {
+            this.#visualCursor = position;
 
         } else {
-            this.visualCursor = --position;
+            this.#visualCursor = --position;
         }
 
         return [start, position];
     }
 
     selectPrevCharacter() {
-        let position1 = this.textUtil.getCursorPosition();
+        let position1 = this.#htmlEditorBuffer.getCursorPosition();
 
-        if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-            position1 = this.visualCursor;
+        if (this.isMode(VISUAL) && this.#visualCursor !== undefined) {
+            position1 = this.#visualCursor;
         }
 
-        if (this.textUtil.getPrevSymbol(position1) === ENTER) {
+        if (this.#htmlEditorBuffer.getCharBefore(position1) === ENTER) {
             return;
         }
 
@@ -237,21 +228,21 @@ export class VimEditor {
             return;
         }
 
-        this.visualCursor = Math.max(this.visualCursor, 0);
+        this.#visualCursor = Math.max(this.#visualCursor, 0);
 
         if (start >= 0 && this.isMode(GENERAL) || this.isMode(VISUAL)) {
-            this.textUtil.select(start, position);
+            this.#htmlEditorBuffer.select(start, position);
         }
     }
 
     append() {
-        const p = this.textUtil.getCursorPosition();
-        this.textUtil.select(p + 1, p + 1);
+        const p = this.#htmlEditorBuffer.getCursorPosition();
+        this.#htmlEditorBuffer.select(p + 1, p + 1);
     }
 
     insert() {
-        const p = this.textUtil.getCursorPosition();
-        this.textUtil.select(p, p);
+        const p = this.#htmlEditorBuffer.getCursorPosition();
+        this.#htmlEditorBuffer.select(p, p);
     }
 
     #adjustNextLineVisual(nextLineStart, position) {
@@ -259,23 +250,23 @@ export class VimEditor {
             return [position - 1, position];
         }
 
-        let start = this.visualStart;
+        let start = this.#visualStart;
 
         if (start > position) {
             position--;
         }
 
-        this.visualCursor = position;
+        this.#visualCursor = position;
 
-        if (this.textUtil.getSymbol(nextLineStart) === ENTER) {
+        if (this.#htmlEditorBuffer.getCharAt(nextLineStart) === ENTER) {
 
-            this.textUtil.appendText(' ', nextLineStart);
-            this.visualCursor = ++position;
+            this.#htmlEditorBuffer.insertAtLineEnd(' ', nextLineStart);
+            this.#visualCursor = ++position;
 
             if (start > position) {
                 // Because the new space character is added, the total number of characters increases,
                 // and the starting position of the visual increases accordingly.
-                this.visualStart = ++start;
+                this.#visualStart = ++start;
             }
         }
 
@@ -285,28 +276,28 @@ export class VimEditor {
     #adjustNextLine(nextLineStart, adjustedLength) {
         let position1 = nextLineStart + adjustedLength;
 
-        if (position1 > this.textUtil.getText().length) {
+        if (position1 > this.#htmlEditorBuffer.text.length) {
             return;
         }
 
         const [start, position] = this.#adjustNextLineVisual(nextLineStart, position1);
-        this.textUtil.select(start, position);
+        this.#htmlEditorBuffer.select(start, position);
 
-        if (this.isMode(GENERAL) && this.textUtil.getSymbol(nextLineStart) === ENTER) {
-            this.textUtil.appendText(' ', nextLineStart);
+        if (this.isMode(GENERAL) && this.#htmlEditorBuffer.getCharAt(nextLineStart) === ENTER) {
+            this.#htmlEditorBuffer.insertAtLineEnd(' ', nextLineStart);
         }
     }
 
     selectNextLine() {
-        const visualCursor = this.isMode(VISUAL) && this.visualCursor;
+        const visualCursor = this.isMode(VISUAL) && this.#visualCursor;
 
-        const nextLineStart = this.textUtil.getNextLineStart(visualCursor);
-        const nextLineEnd = this.textUtil.getNextLineEnd(visualCursor);
+        const nextLineStart = this.#htmlEditorBuffer.getNextLineStart(visualCursor);
+        const nextLineEnd = this.#htmlEditorBuffer.getNextLineEnd(visualCursor);
         const nextLineLength = nextLineEnd - nextLineStart;
 
-        let currentLineSelectedLength = this.textUtil.getCountFromStartToPosInCurrLine(visualCursor);
+        let currentLineSelectedLength = this.#htmlEditorBuffer.getLengthFromLineStart(visualCursor);
 
-        if (this.isMode(VISUAL) && this.visualCursor !== undefined && this.visualStart < this.visualCursor) {
+        if (this.isMode(VISUAL) && this.#visualCursor !== undefined && this.#visualStart < this.#visualCursor) {
             currentLineSelectedLength--;
         }
 
@@ -318,9 +309,9 @@ export class VimEditor {
     }
 
     #getLengthToCursor(cursorPosition) {
-        let lengthToCursor = this.textUtil.getCountFromStartToPosInCurrLine(cursorPosition);
+        let lengthToCursor = this.#htmlEditorBuffer.getLengthFromLineStart(cursorPosition);
 
-        return this.isMode(VISUAL) && this.visualCursor !== undefined && this.visualStart < this.visualCursor
+        return this.isMode(VISUAL) && this.#visualCursor !== undefined && this.#visualStart < this.#visualCursor
             ? lengthToCursor - 1
             : lengthToCursor;
     }
@@ -330,27 +321,27 @@ export class VimEditor {
         let end = position;
 
         if (this.isMode(VISUAL)) {
-            start = this.visualStart;
+            start = this.#visualStart;
 
-            if (this.textUtil.getPrevSymbol(position) !== ENTER && start !== position - 1 && end < start) {
+            if (this.#htmlEditorBuffer.getCharBefore(position) !== ENTER && start !== position - 1 && end < start) {
                 end = position - 1;
             }
 
-            this.visualCursor = end;
+            this.#visualCursor = end;
         }
 
-        this.textUtil.select(start, end);
+        this.#htmlEditorBuffer.select(start, end);
     }
 
     selectPrevLine() {
         let cursorPosition = undefined;
 
-        if (this.isMode(VISUAL) && this.visualCursor !== undefined) {
-            cursorPosition = this.visualCursor;
+        if (this.isMode(VISUAL) && this.#visualCursor !== undefined) {
+            cursorPosition = this.#visualCursor;
         }
 
-        const prevLineStart = this.textUtil.getPrevLineStart(cursorPosition);
-        const prevLineEnd = this.textUtil.getPrevLineEnd(cursorPosition);
+        const prevLineStart = this.#htmlEditorBuffer.getPreviousLineStart(cursorPosition);
+        const prevLineEnd = this.#htmlEditorBuffer.getPreviousLineEnd(cursorPosition);
         const lengthToCursor = this.#getLengthToCursor(cursorPosition);
 
         const prevLineLength = prevLineEnd - prevLineStart;
@@ -360,22 +351,22 @@ export class VimEditor {
 
         this.#makeLastLineSelectionVisual(position);
 
-        if (this.isMode(GENERAL) && this.textUtil.getSymbol(prevLineStart) === ENTER) {
-            this.textUtil.appendText(' ', prevLineStart);
+        if (this.isMode(GENERAL) && this.#htmlEditorBuffer.getCharAt(prevLineStart) === ENTER) {
+            this.#htmlEditorBuffer.insertAtLineEnd(' ', prevLineStart);
         }
     }
 
     moveToCurrentLineHead() {
-        const position = this.textUtil.getCurrLineStartPos();
+        const position = this.#htmlEditorBuffer.getLineStart();
 
         if (this.isMode(GENERAL)) {
-            this.textUtil.select(position, position + 1);
+            this.#htmlEditorBuffer.select(position, position + 1);
         }
 
         if (this.isMode(VISUAL)) {
-            const start = this.visualCursor === undefined
-                ? this.textUtil.getCursorPosition()
-                : this.visualCursor;
+            const start = this.#visualCursor === undefined
+                ? this.#htmlEditorBuffer.getCursorPosition()
+                : this.#visualCursor;
 
             for (let i = start; i > position; i--) {
                 this.selectPrevCharacter();
@@ -385,13 +376,13 @@ export class VimEditor {
 
     moveToCurrentLineTail() {
         if (this.isMode(GENERAL)) {
-            let position = this.textUtil.getCurrLineEndPos();
-            this.textUtil.select(position - 1, position);
+            let position = this.#htmlEditorBuffer.getLengthToLineEnd();
+            this.#htmlEditorBuffer.select(position - 1, position);
         }
 
         if (this.isMode(VISUAL)) {
-            let start = this.visualCursor || this.textUtil.getCursorPosition();
-            let position = this.textUtil.getCurrLineEndPos(start);
+            let start = this.#visualCursor || this.#htmlEditorBuffer.getCursorPosition();
+            let position = this.#htmlEditorBuffer.getLengthToLineEnd(start);
 
             if (start === position - 1) {
                 position--;
@@ -404,25 +395,24 @@ export class VimEditor {
     }
 
     appendNewLine() {
-        const position = this.textUtil.getCurrLineEndPos();
+        const position = this.#htmlEditorBuffer.getLengthToLineEnd();
 
-        this.textUtil.appendText(ENTER + ' ', position);
-        this.textUtil.select(position + 1, position + 1);
+        this.#htmlEditorBuffer.insertAtLineEnd(ENTER + ' ', position);
+        this.#htmlEditorBuffer.select(position + 1, position + 1);
     }
 
     insertNewLine() {
-        const position = this.textUtil.getCurrLineStartPos();
+        const position = this.#htmlEditorBuffer.getLineStart();
 
-        this.textUtil.appendText(' ' + ENTER, position);
-        this.textUtil.select(position, position);
+        this.#htmlEditorBuffer.insertAtLineEnd(' ' + ENTER, position);
+        this.#htmlEditorBuffer.select(position, position);
     }
 
     deleteSelected() {
-        const position = this.textUtil.getCursorPosition();
-        const deletedText = this.textUtil.delSelected();
+        const position = this.#htmlEditorBuffer.getCursorPosition();
+        const deletedText = this.#htmlEditorBuffer.deleteSelection();
 
-        this.textUtil.select(position, position + 1);
-        this.pasteInNewLineRequest = false;
+        this.#htmlEditorBuffer.select(position, position + 1);
 
         return deletedText;
     }
@@ -438,23 +428,23 @@ export class VimEditor {
         if (this.isMode(VISUAL)) {
             this.delCurrLine();
         } else {
-            this.textUtil.deleteCharBefore();
+            this.#htmlEditorBuffer.deleteCharBefore();
         }
 
         this.switchModeTo(GENERAL);
     }
 
     copyCurrentLine(position) {
-        const start = this.textUtil.getCurrLineStartPos(position);
-        const end = this.textUtil.getCurrLineEndPos(position);
+        const start = this.#htmlEditorBuffer.getLineStart(position);
+        const end = this.#htmlEditorBuffer.getLengthToLineEnd(position);
 
-        this.pasteInNewLineRequest = true;
-        return this.textUtil.getText(start, end + 1);
+        this.#pasteNewLineRequested = true;
+        return this.#htmlEditorBuffer.getSubstring(start, end + 1);
     }
 
     /**
      *
-     * @param {Array<Data>} list
+     * @param {Array<UndoItem>} list
      */
     backToHistory(list) {
         if (!list) { return; }
@@ -462,73 +452,73 @@ export class VimEditor {
         const data = list.pop();
         if (data === undefined) { return; }
 
-        this.textUtil.setText(data.text);
-        this.textUtil.select(data.position, data.position + 1);
+        this.#htmlEditorBuffer.text = data.text;
+        this.#htmlEditorBuffer.select(data.position, data.position + 1);
     }
 
     delCurrLine() {
-        const start = this.textUtil.getCurrLineStartPos();
-        const end = this.textUtil.getCurrLineEndPos();
-        const text = this.textUtil.deleteText(start, end + 1);
+        const start = this.#htmlEditorBuffer.getLineStart();
+        const end = this.#htmlEditorBuffer.getLengthToLineEnd();
+        const text = this.#htmlEditorBuffer.delete(start, end + 1);
 
-        this.textUtil.select(start, start + 1);
-        this.pasteInNewLineRequest = true;
+        this.#htmlEditorBuffer.select(start, start + 1);
+        this.#pasteNewLineRequested = true;
 
         return text;
     }
 
     moveToFirstLine() {
         if (this.isMode(GENERAL)) {
-            this.textUtil.select(0, 1);
+            this.#htmlEditorBuffer.select(0, 1);
 
         } else if (this.isMode(VISUAL)) {
-            this.textUtil.select(this.visualStart, 0);
-            this.visualCursor = 0;
+            this.#htmlEditorBuffer.select(this.#visualStart, 0);
+            this.#visualCursor = 0;
         }
     }
 
     moveToLastLine() {
-        const text = this.textUtil.getText().length;
-        const start = this.textUtil.getCurrLineStartPos(text - 1);
+        const text = this.#htmlEditorBuffer.text.length;
+        const start = this.#htmlEditorBuffer.getLineStart(text - 1);
 
         if (this.isMode(GENERAL)) {
-            this.textUtil.select(start, start + 1);
+            this.#htmlEditorBuffer.select(start, start + 1);
 
         } else if (this.isMode(VISUAL)) {
-            this.textUtil.select(this.visualStart, start + 1);
-            this.visualCursor = start + 1;
+            this.#htmlEditorBuffer.select(this.#visualStart, start + 1);
+            this.#visualCursor = start + 1;
         }
     }
 
     moveToNextWord() {
         const visualCursor = this.isMode(VISUAL)
-            ? this.visualCursor
+            ? this.#visualCursor
             : undefined;
 
-        const [_, lastCharPos] = this.textUtil.getCurrWordPos(visualCursor);
-        if (!lastCharPos) { return; }
+        const [_, lastCharPosition] = this.#htmlEditorBuffer.getWordPosition(visualCursor);
+        if (!lastCharPosition) { return; }
 
         if (this.isMode(GENERAL)) {
-            this.textUtil.select(lastCharPos, lastCharPos + 1);
+            this.#htmlEditorBuffer.select(lastCharPosition, lastCharPosition + 1);
 
         } else if (this.isMode(VISUAL)) {
-            this.textUtil.select(this.visualStart, lastCharPos + 1);
-            this.visualCursor = lastCharPos + 1;
+            this.#htmlEditorBuffer.select(this.#visualStart, lastCharPosition + 1);
+            this.#visualCursor = lastCharPosition + 1;
         }
     }
 
     // TODO: why copyWord?!?
     copyWord(position) {
-        const [_, lastCharPos] = this.textUtil.getCurrWordPos(position);
+        const [_, lastCharPos] = this.#htmlEditorBuffer.getWordPosition(position);
         return lastCharPos;
     }
 
     deleteWord() {
-        const [position, lastCharPos] = this.textUtil.getCurrWordPos();
-        if (lastCharPos === undefined) { return undefined; }
+        const [position, lastCharPosition] = this.#htmlEditorBuffer.getWordPosition();
+        if (lastCharPosition === undefined) { return undefined; }
 
-        const text = this.textUtil.deleteText(position, lastCharPos);
-        this.textUtil.select(position, position + 1);
+        const text = this.#htmlEditorBuffer.delete(position, lastCharPosition);
+        this.#htmlEditorBuffer.select(position, position + 1);
         return text;
     }
 }

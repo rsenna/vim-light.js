@@ -1,7 +1,7 @@
 {
   "name": "vim.js",
   "version": "0.2.2",
-  "description": "simple vim for web textarea and input",
+  "description": "Simple VIM engine for the web",
   "scripts": {
     "dev": "webpack --watch",
     "build": "webpack",

@@ -1,28 +1,17 @@
-/**
- * Created by top on 15-9-6.
- */
+import {VimController} from './vim_controller';
+import {isFunction} from './globals';
 
-import {Controller} from './controller';
-
-class RouterItem {
-    /**
-     * @type string
-     */
+class KeyboardItem {
+    /** @type string */
     #name;
 
-    /**
-     * @type string
-     */
+    /** @type string */
     #mode = '';
 
-    /**
-     * @type boolean
-     */
+    /** @type boolean */
     #record = false;
 
-    /**
-     * @type {Function<Controller>}
-     */
+    /** @type {Function<VimController>} */
     #action = undefined;
 
     get name() { return this.#name; }
@@ -38,32 +27,26 @@ class RouterItem {
     set action(value) { this.#action = value; }
 }
 
-export class Router {
-    /**
-     * @type {Controller}
-     */
+export class KeyboardHandler {
+    /** @type {VimController} */
     #controller;
 
-    /**
-     * @type {number|undefined}
-     */
+    /** @type {number|undefined} */
     #currentCodeNumber = undefined;
 
-    /**
-     * @type {Object<number, RouterItem>}
-     */
+    /** @type {Object<number, KeyboardItem>} */
     #keymap = {};
 
     /**
-     * Retrieves the current keymapping, associating key-codes and behaviour
+     * Retrieve the current keymapping, associating key-codes and behaviour
      *
-     * @return {Object<string, RouterItem>}
+     * @return {Object<string, KeyboardItem>}
      */
     get keymap() { return this.#keymap; }
 
     /**
      *
-     * @param {Controller} controller
+     * @param {VimController} controller
      */
     constructor(controller) {
         this.#controller = controller;
@@ -72,7 +55,7 @@ export class Router {
     /**
      * @param {number|string} codeNumber
      * @param {string} codeName
-     * @return {Router} The instance of the class for chaining method calls.
+     * @return {KeyboardHandler} The instance of the class for chaining method calls.
      * @todo
      * Currently, `codeNumber` can be either a string or a number.
      * A string is used for a "chord" of keys (e.g. 'gg'), and that's
@@ -82,7 +65,7 @@ export class Router {
      */
     code(codeNumber, codeName) {
         if (!this.#keymap[codeNumber]) {
-            this.#keymap[codeNumber] = new RouterItem();
+            this.#keymap[codeNumber] = new KeyboardItem();
         }
 
         const item = this.#keymap[codeNumber];
@@ -101,7 +84,7 @@ export class Router {
      *
      * @param {string} codeName - The name to associate with the method.
      * @param {string} methodName - The method name to be registered.
-     * @return {Router|undefined} The instance of the class for chaining method calls.
+     * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      * @deprecated
      */
     action(codeName, methodName) {
@@ -109,7 +92,7 @@ export class Router {
             return undefined;
         }
 
-        // TODO: This takes a `RouterItem` with the `#currentCodeNumber`, and then
+        // TODO: This takes a `KeyboardItem` with the `#currentCodeNumber`, and then
         //       **adds a new property `codeName`** to it, containing the `methodName`!
         //       very cumbersome and not very practical... (but it seems to work)
         this.#keymap[this.#currentCodeNumber][codeName] = methodName;
@@ -120,7 +103,7 @@ export class Router {
      * Attempt to reimplement {@link action} in a more sound manner
      *
      * @param {string} codeName
-     * @param {Function<Controller>} action
+     * @param {Function<VimController>} action
      */
     actionEx(codeName, action) {
         if (!this.#currentCodeNumber) {
@@ -136,7 +119,7 @@ export class Router {
      * If no current code is present, the method will exit without modifications.
      *
      * @param {string} mode - The mode to be set for the current code.
-     * @return {Router|undefined} The instance of the class for chaining method calls.
+     * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      */
     mode(mode) {
         if (!this.#currentCodeNumber) {
@@ -151,7 +134,7 @@ export class Router {
      * Updates the record status for the current code in the internal keys object.
      *
      * @param {boolean} isRecord - A boolean value indicating whether the current code should be marked as a record.
-     * @return {Router|undefined} The instance of the class for chaining method calls.
+     * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      */
     record(isRecord) {
         if (!this.#currentCodeNumber) {
@@ -169,24 +152,26 @@ export class Router {
      * @param {function} before
      * @param {function} after
      * @return void
+     * @todo This doesn't do much since it's the result of refactoring.
+     *       Should probably be removed.
      */
     executeActionEx(code, key, record = undefined, before = undefined, after = undefined) {
-        if (before && typeof before === 'function') {
+        if (isFunction(before)) {
             before();
         }
 
         const routerItem = this.#keymap[code];
 
         if (routerItem && routerItem[key]) {
-            if (record && typeof record === 'function' && routerItem.record) {
+            if (isFunction(record)) {
                 record();
             }
 
-            if (routerItem.action && typeof routerItem.action === 'function') {
+            if (isFunction(routerItem.action)) {
                 routerItem.action.call(this.#controller);
             }
 
-            if (after && typeof after === 'function') {
+            if (isFunction(after)) {
                 after();
             }
         }
