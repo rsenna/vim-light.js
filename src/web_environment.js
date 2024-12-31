@@ -1,11 +1,20 @@
-import * as console from 'node:console';
-import * as g from './globals';
 import {Config} from './config';
 import {VimController, UndoItem} from './vim_controller';
 import {KeyboardHandler} from './keyboard_handler';
 import {HTMLEditorBuffer} from './html_editor_buffer';
 import {VimEditor} from './vim_editor';
 import {setupKeybindings} from './vim_keybindings.js';
+import {
+    ENTER,
+    ERROR_MESSAGE,
+    getCode,
+    getCurrentTime,
+    indexOf,
+    isFunction,
+    showMsg,
+    VALID_KEY_CODES,
+    VIM_MODE
+} from './globals';
 
 export class WebEnvironment {
     /** @type {KeyboardHandler} */
@@ -89,9 +98,9 @@ export class WebEnvironment {
      * @return {boolean}
      */
     filterCode(code) {
-        if (code === 229 && (this.#vimEditor.isMode(g.GENERAL) || this.#vimEditor.isMode(g.VISUAL))) {
-            this.log(g.ERROR_MESSAGE);
-            g.showMsg(g.ERROR_MESSAGE);
+        if (code === 229 && (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL))) {
+            this.log(ERROR_MESSAGE);
+            showMsg(ERROR_MESSAGE);
 
             return false;
         }
@@ -107,7 +116,7 @@ export class WebEnvironment {
      * @param {Event} _event (unused)
      */
     onResetCursorPositionHandler(_event) {
-        if (this.#vimEditor.isMode(g.GENERAL) || this.#vimEditor.isMode(g.VISUAL)) {
+        if (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
             this.#vimEditor.resetCursorByMouse();
         }
     }
@@ -118,7 +127,7 @@ export class WebEnvironment {
      * @param {boolean}replaced
      */
     onKeyDownHandler(event, replaced) {
-        let code = g.getCode(event);
+        let code = getCode(event);
 
         this.log('mode:' + this.#vimEditor.currentMode);
 
@@ -171,15 +180,14 @@ export class WebEnvironment {
      * @param {KeyboardEvent} event
      */
     onFieldKeyDown(event) {
+        const code = getCode(event);
         let replaced = false;
 
-        const code = g.getCode(event);
-
-        if (g.indexOf(g.key_code_white_list, code) !== -1) {
+        if (indexOf(VALID_KEY_CODES, code) !== -1) {
             return;
         }
 
-        if (this.#vimEditor.isMode(g.GENERAL) || this.#vimEditor.isMode(g.VISUAL)) {
+        if (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
             if (this.#vimEditor.replaceCharRequested) {
                 replaced = true;
                 this.#vimEditor.replaceCharRequested = false;
@@ -212,7 +220,7 @@ export class WebEnvironment {
             this.#events = {};
         }
 
-        if (g.isFunction(fn)) {
+        if (isFunction(fn)) {
             this.#events[event] = fn;
         }
 
@@ -248,7 +256,7 @@ export class WebEnvironment {
     }
 
     repeat(action, repeatCount) {
-        if (!g.isFunction(action)) {
+        if (!isFunction(action)) {
             return;
         }
 
@@ -271,7 +279,7 @@ export class WebEnvironment {
             // TODO: Executed on last iteration only
             if (i === repeatCount - 1) {
                 // Remove line break char
-                lastResult = lastResult.replace(g.ENTER, '');
+                lastResult = lastResult.replace(ENTER, '');
             }
 
             this.#clipboard += lastResult;
@@ -303,7 +311,7 @@ export class WebEnvironment {
     }
 
     getElementIndex() {
-        return g.indexOf(this.#fields, this.#currentField);
+        return indexOf(this.#fields, this.#currentField);
     }
 
     numericPrefixParser(code) {
@@ -338,7 +346,7 @@ export class WebEnvironment {
     }
 
     isUnionCode(code, maxTime = 600) {
-        const currentTime = g.getCurrentTime();
+        const currentTime = getCurrentTime();
         const previousCodeTime = this.#previousCodeTime;
         const previousCode = this.#previousCode;
 
@@ -369,7 +377,7 @@ export class WebEnvironment {
 
         const route = this.#keyboardHandler.keymap[code];
 
-        if (!route || !this.#vimEditor.isMode(g.GENERAL) && !this.#vimEditor.isMode(g.VISUAL)) {
+        if (!route || !this.#vimEditor.isMode(VIM_MODE.GENERAL) && !this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
             return false;
         }
 

@@ -1,24 +1,27 @@
 {
-  "name": "vim.js",
-  "version": "0.2.2",
+  "name": "vim-light.js",
+  "version": "0.0.1",
   "description": "Simple VIM engine for the web",
   "scripts": {
-    "dev": "webpack --watch",
-    "build": "webpack",
-    "build_min": "webpack --config webpack.min.config.js"
+    "dev": "webpack --watch --config webpack-dev.config.js",
+    "build": "webpack --config webpack-dev.config.js",
+    "build-min": "webpack --config webpack-min.config.js"
   },
   "keywords": [
     "vim",
-    "vim.js"
+    "vim.js",
+    "vim-light.js"
   ],
-  "author": "toplan",
+  "author": "rsenna",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/toplan/Vim.js"
+    "url": "https://github.com/rsenna/vim-light.js"
   },
-  "bugs": "https://github.com/toplan/Vim.js/issues",
+  "bugs": "https://github.com/rsenna//vim-light.js/issues",
   "devDependencies": {
-    "webpack": "^1.12.15"
+    "terser-webpack-plugin": "^5.3.11",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1"
   }
 }

@@ -5,8 +5,8 @@ class KeyboardItem {
     /** @type string */
     #name;
 
-    /** @type string */
-    #mode = '';
+    /** @type number */
+    #mode = 0;
 
     /** @type boolean */
     #record = false;
@@ -71,7 +71,7 @@ export class KeyboardHandler {
         const item = this.#keymap[codeNumber];
 
         item.name = codeName;
-        item.mode = '';
+        item.mode = undefined;
         item.record = false;
 
         this.#currentCodeNumber = codeNumber;
@@ -118,7 +118,7 @@ export class KeyboardHandler {
      * Sets the mode for the current code in the internal key storage.
      * If no current code is present, the method will exit without modifications.
      *
-     * @param {string} mode - The mode to be set for the current code.
+     * @param {number} mode - The mode to be set for the current code.
      * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      */
     mode(mode) {

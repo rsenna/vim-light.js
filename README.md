@@ -45,19 +45,18 @@ for Vim users on the web
     vim.open({
         debug: true,
         showMsg: function (msg) {
-            alert('#vim-light.js says: ' + msg);
+            alert('vim-light.js says: ' + msg);
         }
     });
 </script>
 ```
-
-Note: `vim-light.js` is lightweight (currently about 20 KiB).
+`vim-light.js` has low footprint: 14 Kib minimized, XX Kib gzipped.
 
 ### Development and Build Instructions
 
 ```bash
 # Install Dependencies
-npm install #vim-light.js
+npm install
 
 # Development Mode (with file watcher)
 npm run dev
@@ -66,7 +65,7 @@ npm run dev
 npm run build
 
 # Build Minified JS File
-npm run build_min
+npm run build-min
 ```
 
 ### Browser Support

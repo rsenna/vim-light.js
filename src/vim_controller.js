@@ -1,7 +1,7 @@
 import {WebEnvironment} from './web_environment';
 import {VimEditor} from './vim_editor';
 import {HTMLEditorBuffer} from './html_editor_buffer';
-import {EDIT, ENTER, GENERAL, VISUAL} from './globals';
+import {ENTER, VIM_MODE} from './globals';
 
 export class VimController {
     /**@type {WebEnvironment} */
@@ -36,19 +36,19 @@ export class VimController {
     }
 
     switchModeToGeneral() {
-        const cMode = this.#vimEditor.currentMode;
+        const mode = this.#vimEditor.currentMode;
 
-        if (this.#vimEditor.isMode(GENERAL)) {
+        if (this.#vimEditor.isMode(VIM_MODE.GENERAL)) {
             return;
         }
 
-        this.#vimEditor.switchModeTo(GENERAL);
+        this.#vimEditor.switchModeTo(VIM_MODE.GENERAL);
 
         const position = this.#htmlEditorBuffer.getCursorPosition();
         const start = this.#htmlEditorBuffer.getLineStart();
 
         if (position !== start) {
-            if (cMode === VISUAL) { // TODO: is this ever called?
+            if (mode === VIM_MODE.VISUAL) { // TODO: is this ever called?
                 this.#vimEditor.selectNextCharacter();
             }
 
@@ -71,8 +71,8 @@ export class VimController {
     }
 
     switchModeToVisual() {
-        if (!this.#vimEditor.isMode(VISUAL)) {
-            this.#vimEditor.switchModeTo(VISUAL);
+        if (!this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
+            this.#vimEditor.switchModeTo(VIM_MODE.VISUAL);
             this.#vimEditor.resetVisualMode();
             return;
         }
@@ -92,12 +92,12 @@ export class VimController {
             this.#htmlEditorBuffer.select(start, start + 1);
         }
 
-        this.#vimEditor.switchModeTo(GENERAL);
+        this.#vimEditor.switchModeTo(VIM_MODE.GENERAL);
     }
 
     append() {
         this.#vimEditor.append();
-        setTimeout(() => this.#vimEditor.switchModeTo(EDIT), 100);
+        setTimeout(() => this.#vimEditor.switchModeTo(VIM_MODE.EDIT), 100);
     }
 
     appendLineTail() {
@@ -107,7 +107,7 @@ export class VimController {
 
     insert() {
         this.#vimEditor.insert();
-        setTimeout(() => this.#vimEditor.switchModeTo(EDIT), 100);
+        setTimeout(() => this.#vimEditor.switchModeTo(VIM_MODE.EDIT), 100);
     }
 
     insertLineHead() {
@@ -127,7 +127,7 @@ export class VimController {
         this.#vimEditor.pasteNewLineRequested = false;
         this.#environment.clipboard = this.#htmlEditorBuffer.getSelectedText();
 
-        if (this.#vimEditor.isMode(VISUAL)) {
+        if (this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
             this.switchModeToGeneral();
         }
     }
@@ -184,13 +184,13 @@ export class VimController {
     appendNewLine() {
         this.#vimEditor.appendNewLine();
 
-        setTimeout(() => this.#vimEditor.switchModeTo(EDIT), 100);
+        setTimeout(() => this.#vimEditor.switchModeTo(VIM_MODE.EDIT), 100);
     }
 
     insertNewLine() {
         this.#vimEditor.insertNewLine();
 
-        setTimeout(() => this.#vimEditor.switchModeTo(EDIT), 100);
+        setTimeout(() => this.#vimEditor.switchModeTo(VIM_MODE.EDIT), 100);
     }
 
     /**

@@ -1,6 +1,6 @@
 import {HTMLEditorBuffer} from './html_editor_buffer';
 import {UndoItem} from './vim_controller';
-import {COMMAND, EDIT, ENTER, GENERAL, VISUAL} from './globals';
+import {ENTER, VIM_MODE} from './globals';
 
 /**
  * Represents a Vim Editor, bound to a {@link HTMLEditorBuffer}
@@ -14,8 +14,8 @@ import {COMMAND, EDIT, ENTER, GENERAL, VISUAL} from './globals';
  * @see {HTMLTextAreaElement}
  */
 export class VimEditor {
-    /** @type {string} */
-    #currentMode = EDIT;
+    /** @type {number} */
+    #currentMode = VIM_MODE.EDIT;
 
     /**
      * The starting position of selected text (visual mode)
@@ -61,26 +61,30 @@ export class VimEditor {
 
     /**
      *
-     * @param {string} modeName
+     * @param {number} mode
      * @return {boolean}
      * @todo Use [rest parameter syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters)
      *       So it can receive multiple modes (to be tested with `or` logic,
      *       of course)
      */
-    isMode(modeName) {
-        return this.#currentMode === modeName;
+    isMode(mode) {
+        return this.#currentMode === mode;
     }
 
-    static modeNames = [GENERAL, COMMAND, EDIT, VISUAL];
+    static vimModes = Object.values(VIM_MODE);
 
-    switchModeTo(modeName) {
-        if (VimEditor.modeNames.indexOf(modeName) > -1) {
-            this.#currentMode = modeName;
+    /**
+     *
+     * @param {number} mode
+     */
+    switchModeTo(mode) {
+        if (VimEditor.vimModes.indexOf(mode) > -1) {
+            this.#currentMode = mode;
         }
     }
 
     resetCursorByMouse() {
-        this.switchModeTo(GENERAL);
+        this.switchModeTo(VIM_MODE.GENERAL);
 
         const position = this.#htmlEditorBuffer.getCursorPosition();
         const start = this.#htmlEditorBuffer.getLineStart();
@@ -111,15 +115,15 @@ export class VimEditor {
      * @private
      */
     #getCursorPosition() {
-        const position = this.isMode(VISUAL) && this.#visualCursor !== undefined
+        const position = this.isMode(VIM_MODE.VISUAL) && this.#visualCursor !== undefined
             ? this.#visualCursor
             : this.#htmlEditorBuffer.getCursorPosition();
 
-        if (this.isMode(GENERAL) && this.#htmlEditorBuffer.getCharAfter(position) === ENTER) {
+        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAfter(position) === ENTER) {
             return undefined;
         }
 
-        if (this.isMode(VISUAL) && this.#htmlEditorBuffer.getCharAfter(position - 1) === ENTER) {
+        if (this.isMode(VIM_MODE.VISUAL) && this.#htmlEditorBuffer.getCharAfter(position - 1) === ENTER) {
             return undefined;
         }
 
@@ -142,7 +146,7 @@ export class VimEditor {
         let lastVisualStart = undefined;
         let lastCursorPosition = undefined;
 
-        if (this.isMode(VISUAL)) {
+        if (this.isMode(VIM_MODE.VISUAL)) {
             start = this.#visualStart;
             lastVisualCursor = this.#visualCursor = position + 1;
             lastVisualStart = this.#visualStart;
@@ -151,7 +155,7 @@ export class VimEditor {
 
         this.#htmlEditorBuffer.select(start, position + 2);
 
-        if (!this.isMode(VISUAL)) {
+        if (!this.isMode(VIM_MODE.VISUAL)) {
             return;
         }
 
@@ -180,7 +184,7 @@ export class VimEditor {
      * @private
      */
     #updateVisualPosition(position) {
-        if (!this.isMode(VISUAL)) {
+        if (!this.isMode(VIM_MODE.VISUAL)) {
             return [position - 1, position];
         }
 
@@ -214,7 +218,7 @@ export class VimEditor {
     selectPrevCharacter() {
         let position1 = this.#htmlEditorBuffer.getCursorPosition();
 
-        if (this.isMode(VISUAL) && this.#visualCursor !== undefined) {
+        if (this.isMode(VIM_MODE.VISUAL) && this.#visualCursor !== undefined) {
             position1 = this.#visualCursor;
         }
 
@@ -230,7 +234,7 @@ export class VimEditor {
 
         this.#visualCursor = Math.max(this.#visualCursor, 0);
 
-        if (start >= 0 && this.isMode(GENERAL) || this.isMode(VISUAL)) {
+        if (start >= 0 && this.isMode(VIM_MODE.GENERAL) || this.isMode(VIM_MODE.VISUAL)) {
             this.#htmlEditorBuffer.select(start, position);
         }
     }
@@ -246,7 +250,7 @@ export class VimEditor {
     }
 
     #adjustNextLineVisual(nextLineStart, position) {
-        if (!this.isMode(VISUAL)) {
+        if (!this.isMode(VIM_MODE.VISUAL)) {
             return [position - 1, position];
         }
 
@@ -283,13 +287,13 @@ export class VimEditor {
         const [start, position] = this.#adjustNextLineVisual(nextLineStart, position1);
         this.#htmlEditorBuffer.select(start, position);
 
-        if (this.isMode(GENERAL) && this.#htmlEditorBuffer.getCharAt(nextLineStart) === ENTER) {
+        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAt(nextLineStart) === ENTER) {
             this.#htmlEditorBuffer.insertAtLineEnd(' ', nextLineStart);
         }
     }
 
     selectNextLine() {
-        const visualCursor = this.isMode(VISUAL) && this.#visualCursor;
+        const visualCursor = this.isMode(VIM_MODE.VISUAL) && this.#visualCursor;
 
         const nextLineStart = this.#htmlEditorBuffer.getNextLineStart(visualCursor);
         const nextLineEnd = this.#htmlEditorBuffer.getNextLineEnd(visualCursor);
@@ -297,7 +301,7 @@ export class VimEditor {
 
         let currentLineSelectedLength = this.#htmlEditorBuffer.getLengthFromLineStart(visualCursor);
 
-        if (this.isMode(VISUAL) && this.#visualCursor !== undefined && this.#visualStart < this.#visualCursor) {
+        if (this.isMode(VIM_MODE.VISUAL) && this.#visualCursor !== undefined && this.#visualStart < this.#visualCursor) {
             currentLineSelectedLength--;
         }
 
@@ -311,7 +315,7 @@ export class VimEditor {
     #getLengthToCursor(cursorPosition) {
         let lengthToCursor = this.#htmlEditorBuffer.getLengthFromLineStart(cursorPosition);
 
-        return this.isMode(VISUAL) && this.#visualCursor !== undefined && this.#visualStart < this.#visualCursor
+        return this.isMode(VIM_MODE.VISUAL) && this.#visualCursor !== undefined && this.#visualStart < this.#visualCursor
             ? lengthToCursor - 1
             : lengthToCursor;
     }
@@ -320,7 +324,7 @@ export class VimEditor {
         let start = position - 1;
         let end = position;
 
-        if (this.isMode(VISUAL)) {
+        if (this.isMode(VIM_MODE.VISUAL)) {
             start = this.#visualStart;
 
             if (this.#htmlEditorBuffer.getCharBefore(position) !== ENTER && start !== position - 1 && end < start) {
@@ -336,7 +340,7 @@ export class VimEditor {
     selectPrevLine() {
         let cursorPosition = undefined;
 
-        if (this.isMode(VISUAL) && this.#visualCursor !== undefined) {
+        if (this.isMode(VIM_MODE.VISUAL) && this.#visualCursor !== undefined) {
             cursorPosition = this.#visualCursor;
         }
 
@@ -351,7 +355,7 @@ export class VimEditor {
 
         this.#makeLastLineSelectionVisual(position);
 
-        if (this.isMode(GENERAL) && this.#htmlEditorBuffer.getCharAt(prevLineStart) === ENTER) {
+        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAt(prevLineStart) === ENTER) {
             this.#htmlEditorBuffer.insertAtLineEnd(' ', prevLineStart);
         }
     }
@@ -359,11 +363,11 @@ export class VimEditor {
     moveToCurrentLineHead() {
         const position = this.#htmlEditorBuffer.getLineStart();
 
-        if (this.isMode(GENERAL)) {
+        if (this.isMode(VIM_MODE.GENERAL)) {
             this.#htmlEditorBuffer.select(position, position + 1);
         }
 
-        if (this.isMode(VISUAL)) {
+        if (this.isMode(VIM_MODE.VISUAL)) {
             const start = this.#visualCursor === undefined
                 ? this.#htmlEditorBuffer.getCursorPosition()
                 : this.#visualCursor;
@@ -375,12 +379,12 @@ export class VimEditor {
     }
 
     moveToCurrentLineTail() {
-        if (this.isMode(GENERAL)) {
+        if (this.isMode(VIM_MODE.GENERAL)) {
             let position = this.#htmlEditorBuffer.getLengthToLineEnd();
             this.#htmlEditorBuffer.select(position - 1, position);
         }
 
-        if (this.isMode(VISUAL)) {
+        if (this.isMode(VIM_MODE.VISUAL)) {
             let start = this.#visualCursor || this.#htmlEditorBuffer.getCursorPosition();
             let position = this.#htmlEditorBuffer.getLengthToLineEnd(start);
 
@@ -425,13 +429,13 @@ export class VimEditor {
      * That's the default behaviour of `S-X` on VimEditor/Neovim
      */
     delCurrentLineOrCharBefore() {
-        if (this.isMode(VISUAL)) {
+        if (this.isMode(VIM_MODE.VISUAL)) {
             this.delCurrLine();
         } else {
             this.#htmlEditorBuffer.deleteCharBefore();
         }
 
-        this.switchModeTo(GENERAL);
+        this.switchModeTo(VIM_MODE.GENERAL);
     }
 
     copyCurrentLine(position) {
@@ -468,10 +472,10 @@ export class VimEditor {
     }
 
     moveToFirstLine() {
-        if (this.isMode(GENERAL)) {
+        if (this.isMode(VIM_MODE.GENERAL)) {
             this.#htmlEditorBuffer.select(0, 1);
 
-        } else if (this.isMode(VISUAL)) {
+        } else if (this.isMode(VIM_MODE.VISUAL)) {
             this.#htmlEditorBuffer.select(this.#visualStart, 0);
             this.#visualCursor = 0;
         }
@@ -481,27 +485,27 @@ export class VimEditor {
         const text = this.#htmlEditorBuffer.text.length;
         const start = this.#htmlEditorBuffer.getLineStart(text - 1);
 
-        if (this.isMode(GENERAL)) {
+        if (this.isMode(VIM_MODE.GENERAL)) {
             this.#htmlEditorBuffer.select(start, start + 1);
 
-        } else if (this.isMode(VISUAL)) {
+        } else if (this.isMode(VIM_MODE.VISUAL)) {
             this.#htmlEditorBuffer.select(this.#visualStart, start + 1);
             this.#visualCursor = start + 1;
         }
     }
 
     moveToNextWord() {
-        const visualCursor = this.isMode(VISUAL)
+        const visualCursor = this.isMode(VIM_MODE.VISUAL)
             ? this.#visualCursor
             : undefined;
 
         const [_, lastCharPosition] = this.#htmlEditorBuffer.getWordPosition(visualCursor);
         if (!lastCharPosition) { return; }
 
-        if (this.isMode(GENERAL)) {
+        if (this.isMode(VIM_MODE.GENERAL)) {
             this.#htmlEditorBuffer.select(lastCharPosition, lastCharPosition + 1);
 
-        } else if (this.isMode(VISUAL)) {
+        } else if (this.isMode(VIM_MODE.VISUAL)) {
             this.#htmlEditorBuffer.select(this.#visualStart, lastCharPosition + 1);
             this.#visualCursor = lastCharPosition + 1;
         }

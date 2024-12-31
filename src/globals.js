@@ -10,10 +10,12 @@ export const symbolRegEx2 = /\S/;
 export const findSymbolChar = /[^\w\u4e00-\u9fa5]/;
 export const findGeneralChar = /[\w\u4e00-\u9fa5]/;
 
-export const GENERAL = 'general_mode';
-export const EDIT = 'edit_mode';
-export const VISUAL = 'visual_mode';
-export const COMMAND = 'command_mode'; // TODO: unused?
+export const VIM_MODE = Object.freeze({
+    GENERAL: 1,
+    EDIT: 2,
+    VISUAL: 3,
+    COMMAND: 4, // TODO: currently unused
+});
 
 export const ERROR_MESSAGE = 'Execution failure! Please use the vim ' +
     'instructions in the English input method.';
@@ -49,9 +51,9 @@ export const showMsg = (msg, code) =>
     alert(msg + ' code: ' + code);
 
 /**
- * VimEditor key codes whitelist
+ * Array of valid key codes
  * @type {Array<number>}
  */
-export const key_code_white_list = [
+export const VALID_KEY_CODES = [
     9, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123
 ];

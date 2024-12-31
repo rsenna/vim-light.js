@@ -1,12 +1,13 @@
 import {KeyboardHandler} from './keyboard_handler';
+import {VIM_MODE} from './globals';
 
 /**
  * @author rsenna
- * New version of the keybinding routing engine, using lambdas instead of evil
- * {@link eval} magic...
+ * New version of the keybinding routing engine, using lambdas instead of _evil
+ * {@link eval} magic_...
  * @remarks
  * By making binding more "strongly typed", I managed to identify a missing
- * implementation {@link Controller#shiftX}, which is required for executing
+ * implementation {@link VimController#shiftX}, which is required for executing
  * the `<S-x>` command (normal and visual modes)
  * @todo
  * Duplication in `codeName` arguments on {@link KeyboardHandler#code} and
@@ -81,7 +82,7 @@ export function setupKeybindings(keyboardHandler) {
     keyboardHandler.code(85, 'u').actionEx('u', c => c.backToHistory);
 
     // copy char
-    keyboardHandler.code(89, 'y').actionEx('y', c => c.copyChar).mode('visual_mode');
+    keyboardHandler.code(89, 'y').actionEx('y', c => c.copyChar).mode(VIM_MODE.VISUAL);
     keyboardHandler.code('89_89', 'yy').actionEx('yy', c => c.copyCurrentLine);
 
     // v
@@ -98,7 +99,7 @@ export function setupKeybindings(keyboardHandler) {
     // delete selected char in visual mode
     keyboardHandler.code(68, 'd')
         .actionEx('d', c => c.delCharAfter)
-        .mode('visual_mode')
+        .mode(VIM_MODE.VISUAL)
         .record(true);
 
     // delete line
