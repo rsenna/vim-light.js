@@ -61,11 +61,6 @@ THE SOFTWARE.
 </body>
 <script src="../build/vim-light.js"></script>
 <script type="text/javascript">
-    vim.open({
-        debug : true,
-        showMsg: function(msg){
-            alert('msg:' + msg);
-        }
-    });
+    const environment = vim.open({ debug : true });
 </script>
 </html>

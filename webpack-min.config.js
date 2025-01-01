@@ -1,9 +1,10 @@
+/* eslint no-undef: 0 */
 const path = require('path');
 const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
     entry: {
-        script: './index.js'
+        script: './index.js',
     },
     optimization: {
         minimize: true,
@@ -24,7 +25,7 @@ module.exports = {
                         passes: 1, // TODO: increase later to see if it makes a difference
                         pure_getters: false, // TODO: check if it makes a difference
                         toplevel: true,
-                        unsafe: true
+                        unsafe: true,
                     },
                     ecma: 2015,
                     format: {
@@ -41,20 +42,20 @@ module.exports = {
 
                         properties: {
                             // mangle property options
-                            keep_quoted: 'strict'
-                        }
+                            keep_quoted: 'strict',
+                        },
                     },
                     sourceMap: {
                         // source map options
                     },
-                }
-            })
-        ]
+                },
+            }),
+        ],
     },
     mode: 'production',
     output: {
         path: path.resolve('./build'),
         filename: 'vim-light.min.js',
-        publicPath: '/build'
-    }
+        publicPath: '/build',
+    },
 };

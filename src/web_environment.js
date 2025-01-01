@@ -1,111 +1,98 @@
 import {Config} from './config';
-import {HTMLEditorBuffer} from './html_editor_buffer';
-import {KeyboardHandler} from './keyboard_handler';
-import {ConsoleLogger, Logger} from './logger';
-import {UndoItem, VimController} from './vim_controller';
-import {VimEditor} from './vim_editor';
-import {loadKeymap} from './vim_keymap.js';
 import {
     CR_CHAR,
     ERROR_MESSAGE,
+    EXTRA_KEY_CODES,
     getCode,
     getCurrentTime,
     isFunction,
     MODIFIER,
     showMsg,
-    EXTRA_KEY_CODES,
-    VIM_MODE
+    VIM_MODE,
 } from './globals';
+import {HTMLEditorBuffer} from './html_editor_buffer';
+import {KeyboardHandler} from './keyboard_handler';
+import {BrowserLogger} from './logger';
+import {UndoItem, VimController} from './vim_controller';
+import {VimEditor} from './vim_editor';
+import {bindKeymap} from './vim_keymap.js';
 
 export class WebEnvironment {
-    /** @type {Logger} */
-    #logger = undefined;
-
-    /** @type {KeyboardHandler} */
-    #keyboardHandler = undefined;
-
-    /** @type {VimController} */
-    #vimController = undefined;
-
-    /** @type {VimEditor} */
-    #vimEditor = undefined;
-
-    /** @type {HTMLEditorBuffer} */
-    #htmlEditorBuffer = undefined;
-
-    /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
-    #fields = undefined;
-
-    /** @type {HTMLTextAreaElement|HTMLInputElement} */
-    #currentField = undefined;
-
-    /** @type {Config} */
-    #config = Config;
-
-    // TODO: should be a list of registers
+    /**
+     * Undo history for all known fields
+     * @todo items should be trees, not lists (like Vim undo trees)
+     *
+     * @type {Record<number, UndoItem[]>}
+     */
+    #allUndoHistory = [];
     // TODO: should provide access to OS clipboard too
     /** @type {string} */
     #clipboard = undefined;
-
-    // TODO: should be a tree, not a list (like Vim does)
-    /** @type {Array<UndoItem>} */
-    #undoHistory = [];
-
-    /** @type {number} */
-    #undoHistoryLimit = 100;
-
-    /** @type {number|string} */
-    #previousCode = undefined;
-
-    /** @type {number} */
-    #previousCodeTime = 0;
-
+    /** @type {Config} */
+    #config = Config;
+    /** @type {HTMLTextAreaElement|HTMLInputElement} */
+    #currentField = undefined;
+    /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
+    #fields = undefined;
+    /** @type {HTMLEditorBuffer} */
+    #htmlEditorBuffer = undefined;
+    /** @type {KeyboardHandler} */
+    #keyboardHandler = undefined;
+    /** @type {Logger} */
+    #logger = undefined;
+    // TODO: should be a list of registers
     /** @type {string} */
     #numericPrefix = '';
-
-    /** @type {Object<string, function>} */
-    #events = undefined;
+    /** @type {number|string} */
+    #previousCode = undefined;
+    /** @type {number} */
+    #previousCodeTime = 0;
+    /** @type {number} */
+    #undoHistoryLimit = 100;
+    /** @type {VimController} */
+    #vimController = undefined;
+    /** @type {VimEditor} */
+    #vimEditor = undefined;
 
     get clipboard() { return this.#clipboard; }
 
     set clipboard(value) { this.#clipboard = value; }
-
-    get undoHistory() { return this.#undoHistory; }
 
     /**
      * Start up web environment
      * @param {Object} options
      */
     constructor(options) {
-        this.#logger.log('Starting up...');
-
         this.#config = new Config(options);
+        this.#logger = new BrowserLogger(this.#config);
 
         // TODO: should use (dummy) Logger in production - or complete remove log calls
-        this.#logger = new ConsoleLogger(this.#config);
+        this.#logger.log(this.constructor, 'Starting up...');
+
         this.#htmlEditorBuffer = new HTMLEditorBuffer();
         this.#vimEditor = new VimEditor();
         this.#vimController = new VimController(this, this.#vimEditor, this.#htmlEditorBuffer);
         this.#keyboardHandler = new KeyboardHandler(this.#logger, this.#vimController);
-
-        this.#logger.log(this);
         this.#start();
 
-        this.#logger.log('Startup done.');
+        this.#logger.log(this.constructor,'Startup done.');
     }
 
-    #start() {
-        loadKeymap(this.#keyboardHandler);
-        this.#connect();
-    }
+    #bindFields() {
+        /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
+        const fields = window.document
+            .querySelectorAll('input, textarea');
 
-    /**
-     *
-     * @param {NodeListOf<HTMLInputElement|HTMLTextAreaElement>}fields
-     */
-    loadFields(fields) {
         this.#fields = fields;
         this.#currentField = fields[0];
+
+        for (let i = 0; i < fields.length; i++) {
+            const field = fields[i];
+
+            field.onfocus = (event) => this.onFieldFocus(event, field);
+            field.onclick = (event) => this.onFieldClick(event);
+            field.onkeydown = (event) => this.onFieldKeyDown(event);
+        }
     }
 
     /**
@@ -113,55 +100,153 @@ export class WebEnvironment {
      * @param {number}code
      * @return {boolean}
      */
-    filterCode(code) {
-        if (code === 229 && (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL))) {
-            this.#logger.log(ERROR_MESSAGE);
-            showMsg(ERROR_MESSAGE);
+    #filterCode(code) {
+        const error = code === 229 &&
+            (this.#vimEditor.isMode(VIM_MODE.NORMAL) ||
+                this.#vimEditor.isMode(VIM_MODE.VISUAL));
 
+        if (!error) {
+            return true;
+        }
+
+        this.#logger.log(this.#filterCode, ERROR_MESSAGE);
+        showMsg(ERROR_MESSAGE);
+
+        return false;
+    }
+
+    #isUnionCode(code, maxTime = 600) {
+        const currentTime = getCurrentTime();
+        const previousCodeTime = this.#previousCodeTime;
+        const previousCode = this.#previousCode;
+
+        this.#previousCode = code;
+        this.#previousCodeTime = currentTime;
+
+        if (previousCode && (maxTime < 0 || currentTime - previousCodeTime <= maxTime)) {
+            if (previousCode === code) {
+                this.#previousCode = undefined;
+            }
+            return previousCode + '_' + code;
+        }
+
+        return undefined;
+    }
+
+    #numericPrefixParser(code) {
+        if (code === 68 || code === 89) {
+            // TODO: Understand what the original author meant
+            // Prevent numerical calculation errors when ndd and nyy, such as
+            // when code is 68; if it is not intercepted, resetNumericPrefix()
+            // will be executed later, resulting in the inability to obtain the
+            // value during dd.
+            return undefined;
+        }
+
+        const digit = parseInt(String.fromCharCode(code));
+
+        if (!isNaN(digit) && digit >= 0 && digit <= 9) {
+            this.#numericPrefix = this.#numericPrefix + '' + digit;
+            this.#logger.log(this.#numericPrefixParser, 'number:' + this.#numericPrefix);
+
+            return undefined;
+        }
+
+        const currentPrefix = this.#numericPrefix;
+        this.#numericPrefix = ''; // TODO: only single digit numeric prefixes?
+
+        return currentPrefix
+            ? parseInt(currentPrefix)
+            : undefined;
+    }
+
+    /**
+     *
+     * @param event
+     * @param prefix
+     * @param code
+     * @return {boolean}
+     */
+    #parseKeymapping(event, prefix, code) {
+        if (code === 27) {
+            this.#vimController.switchModeToGeneral();
             return false;
         }
+
+        const keymapping = this.#keyboardHandler.keymap[code];
+
+        if (!keymapping || !this.#vimEditor.isMode(VIM_MODE.NORMAL) && !this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
+            return false;
+        }
+
+        if (keymapping.mode && !this.#vimEditor.isMode(keymapping.mode)) {
+            return false;
+        }
+
+        // TODO: deal with other modifiers
+        const modifier = event.shiftKey
+            ? MODIFIER.SHIFT
+            : MODIFIER.NONE;
+
+        this.#keyboardHandler.executeMapping(
+            prefix,
+            code,
+            modifier,
+            () => this.#recordUndoHistory(),
+            () => this.#logger.log(this.#parseKeymapping, `modifier: ${modifier}, keymapping: ${keymapping}`),
+            () => this.#numericPrefix = '');
 
         return true;
     }
 
-    // TODO: Many Event related methods, not sure we need (most of) them
-    //       E.g. on*(), on(), fire()
+    #recordUndoHistory(text, position) {
+        text = text === undefined
+            ? this.#htmlEditorBuffer.text
+            : text;
 
-    /**
-     *
-     * @param {Event} _event (unused)
-     */
-    onResetCursorPositionHandler(_event) {
-        if (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
-            this.#vimEditor.resetCursorByMouse();
+        position = position === undefined
+            ? this.#htmlEditorBuffer.getCursorPosition()
+            : position;
+
+        const data = new UndoItem(position, text);
+        const fieldIndex = this.getFieldIndex();
+
+        if (!this.#allUndoHistory[fieldIndex]) {
+            this.#allUndoHistory[fieldIndex] = [];
+        }
+
+        if (this.#allUndoHistory[fieldIndex].length >= this.#undoHistoryLimit) {
+            this.#allUndoHistory[fieldIndex].shift();
+        }
+
+        this.#allUndoHistory[fieldIndex].push(data);
+        this.#logger.log(this.#recordUndoHistory, this.#allUndoHistory);
+    }
+
+    #start() {
+        bindKeymap(this.#keyboardHandler, this.#vimController);
+        this.#bindFields();
+    }
+
+    getFieldIndex() {
+        // Note: cannot use Array.indexOf(), #fields is of type NodeListOf<>
+        for (let i = 0; i < this.#fields.length; i++) {
+            if (this.#fields[i] === this.#currentField) {
+                return i;
+            }
         }
     }
 
+    /** @type {UndoItem[]} */
+    getUndoHistory(index) { return this.#allUndoHistory[index]; }
+
     /**
      *
-     * @param {KeyboardEvent}event
-     * @param {boolean}replaced
+     * @param {MouseEvent} _event (unused
      */
-    onKeyDownHandler(event, replaced) {
-        let code = getCode(event);
-
-        this.#logger.log(`mode: ${this.#vimEditor.currentMode}`);
-
-        if (replaced) {
-            this.recordUndoHistory();
-            return;
-        }
-
-        if (this.filterCode(code)) {
-            const unionCode = this.isUnionCode(code, -1);
-
-            if (unionCode && (this.#keyboardHandler.keymap)[unionCode]) {
-                code = unionCode;
-            }
-
-            this.#logger.log(`key code:${code}`);
-            const prefix = this.numericPrefixParser(code);
-            this.parseKeymapping(event, prefix, code);
+    onFieldClick(_event) {
+        if (this.#vimEditor.isMode(VIM_MODE.NORMAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
+            this.#vimEditor.resetCursorByMouse();
         }
     }
 
@@ -181,15 +266,7 @@ export class WebEnvironment {
         this.#vimController.htmlEditorBuffer = this.#htmlEditorBuffer;
         this.#vimController.clearReplaceCharRequest();
 
-        this.resetNumericPrefix();
-    }
-
-    /**
-     *
-     * @param {MouseEvent} event
-     */
-    onFieldClick(event) {
-        this.fire('reset_cursor_position', event);
+        this.#numericPrefix = '';
     }
 
     /**
@@ -204,7 +281,7 @@ export class WebEnvironment {
             return;
         }
 
-        if (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
+        if (this.#vimEditor.isMode(VIM_MODE.NORMAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
             if (this.#vimEditor.replaceCharRequested) {
                 replaced = true;
                 this.#vimEditor.replaceCharRequested = false;
@@ -220,46 +297,28 @@ export class WebEnvironment {
                 ? position - 1
                 : position;
 
-            this.recordUndoHistory(undefined, newPosition);
+            this.#recordUndoHistory(undefined, newPosition);
         }
 
-        this.fire('input', event, replaced);
-    }
+        this.#logger.log(this.onFieldKeyDown, `mode: ${this.#vimEditor.currentMode}`);
 
-    /**
-     * Register an event
-     * @param {string} event
-     * @param {function} fn
-     * @return {WebEnvironment}
-     */
-    on(event, fn) {
-        if (!this.#events) {
-            this.#events = {};
+        if (replaced) {
+            this.#recordUndoHistory();
         }
 
-        if (isFunction(fn)) {
-            this.#events[event] = fn;
+        if (!this.#filterCode(code)) {
+            return;
         }
 
-        return this;
-    }
+        const unionCode = this.#isUnionCode(code, -1);
+        const actualCode = unionCode && (this.#keyboardHandler.keymap)[unionCode]
+            ? unionCode
+            : code;
 
-    /**
-     * Trigger an event
-     * @param {string} event
-     * @return {WebEnvironment}
-     */
-    fire(event) {
-        if (!this.#events || !this.#events[event]) {
-            return this;
-        }
+        this.#logger.log(this.onFieldKeyDown, `key code:${actualCode}`);
 
-        const args = Array.prototype.slice.call(arguments, 1) || [];
-        const fn = this.#events[event];
-
-        fn.apply(this, args);
-
-        return this;
+        const prefix = this.#numericPrefixParser(actualCode);
+        this.#parseKeymapping(event, prefix, actualCode);
     }
 
     repeat(action, repeatCount) {
@@ -291,145 +350,5 @@ export class WebEnvironment {
 
             this.#clipboard += lastResult;
         }
-    }
-
-    recordUndoHistory(text, position) {
-        text = text === undefined
-            ? this.#htmlEditorBuffer.text
-            : text;
-
-        position = position === undefined
-            ? this.#htmlEditorBuffer.getCursorPosition()
-            : position;
-
-        const data = new UndoItem(position, text);
-        const fieldIndex = this.getElementIndex();
-
-        if (!this.#undoHistory[fieldIndex]) {
-            this.#undoHistory[fieldIndex] = [];
-        }
-
-        if (this.#undoHistory[fieldIndex].length >= this.#undoHistoryLimit) {
-            this.#undoHistory[fieldIndex].shift();
-        }
-
-        this.#undoHistory[fieldIndex].push(data);
-        this.#logger.log(this.#undoHistory);
-    }
-
-    getElementIndex() {
-        // Note: cannot use Array.indexOf(), #fields is of type NodeListOf<>
-        for (let i = 0; i < this.#fields.length; i++) {
-            if (this.#fields[i] === this.#currentField) {
-                return i;
-            }
-        }
-    }
-
-    numericPrefixParser(code) {
-        if (code === 68 || code === 89) {
-            // TODO: Understand what the original author meant
-            // Prevent numerical calculation errors when ndd and nyy, such as
-            // when code is 68; if it is not intercepted, resetNumericPrefix()
-            // will be executed later, resulting in the inability to obtain the
-            // value during dd.
-            return undefined;
-        }
-
-        const digit = parseInt(String.fromCharCode(code));
-
-        if (!isNaN(digit) && digit >= 0 && digit <= 9) {
-            this.#numericPrefix = this.#numericPrefix + '' + digit;
-            this.#logger.log('number:' + this.#numericPrefix);
-
-            return undefined;
-        }
-
-        const currentPrefix = this.#numericPrefix;
-        this.resetNumericPrefix(); // TODO: This only allows single digit numeric prefixes
-
-        return currentPrefix
-            ? parseInt(currentPrefix)
-            : undefined;
-    }
-
-    resetNumericPrefix() {
-        this.#numericPrefix = '';
-    }
-
-    isUnionCode(code, maxTime = 600) {
-        const currentTime = getCurrentTime();
-        const previousCodeTime = this.#previousCodeTime;
-        const previousCode = this.#previousCode;
-
-        this.#previousCode = code;
-        this.#previousCodeTime = currentTime;
-
-        if (previousCode && (maxTime < 0 || currentTime - previousCodeTime <= maxTime)) {
-            if (previousCode === code) {
-                this.#previousCode = undefined;
-            }
-            return previousCode + '_' + code;
-        }
-
-        return undefined;
-    }
-
-    /**
-     *
-     * @param event
-     * @param prefix
-     * @param code
-     * @return {boolean}
-     */
-    parseKeymapping(event, prefix, code) {
-        if (code === 27) {
-            this.#vimController.switchModeToGeneral();
-            return false;
-        }
-
-        const keymapping = this.#keyboardHandler.keymap[code];
-
-        if (!keymapping || !this.#vimEditor.isMode(VIM_MODE.GENERAL) && !this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
-            return false;
-        }
-
-        if (keymapping.mode && !this.#vimEditor.isMode(keymapping.mode)) {
-            return false;
-        }
-
-        // TODO: deal with other modifiers
-        const modifier = event.shiftKey
-            ? MODIFIER.SHIFT
-            : MODIFIER.NONE;
-
-        this.#keyboardHandler.executeMapping(
-            prefix,
-            code,
-            modifier,
-            this.recordUndoHistory,
-            () => this.#logger.log(`modifier: ${modifier}, keymapping: ${keymapping}`),
-            this.resetNumericPrefix);
-
-        return true;
-    }
-
-    #connect() {
-        /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
-        const fields = window.document
-        .querySelectorAll('input, textarea');
-
-        this.loadFields(fields);
-
-        for (let i = 0; i < fields.length; i++) {
-            const field = fields[i];
-
-            field.onfocus = (event) => this.onFieldFocus(event, field);
-            field.onclick = (event) => this.onFieldClick(event);
-            field.onkeydown = (event) => this.onFieldKeyDown(event);
-        }
-
-        this.on('reset_cursor_position', this.onResetCursorPositionHandler);
-        this.on('input', this.onKeyDownHandler);
     }
 }

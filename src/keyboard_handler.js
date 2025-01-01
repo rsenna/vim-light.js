@@ -1,12 +1,8 @@
-import {VimController} from './vim_controller';
 import {isFunction, MODIFIER} from './globals';
 
 export class KeyboardHandler {
     /** @type {VimController} */
     #controller;
-
-    /** @type {Logger} */
-    #logger;
 
     /**
      * Current key code
@@ -34,6 +30,9 @@ export class KeyboardHandler {
      */
     #keymap = {};
 
+    /** @type {Logger} */
+    #logger;
+
     /**
      * Retrieve the current, complete keymap
      * @todo We should have a method that returns a single keymapping, instead
@@ -54,11 +53,68 @@ export class KeyboardHandler {
     }
 
     /**
+     *
+     * @param {Function<VimController,number>} action
+     * @param {number} modifier
+     */
+    action(action, modifier = MODIFIER.NONE) {
+        if (!this.#fluentKeyCode) {
+            return undefined;
+        }
+
+        this.#keymap[this.#fluentKeyCode].actions[modifier] = action;
+        return this;
+    }
+
+    /**
+     * @param {number} prefix
+     * @param {number|string} code
+     * @param {number} modifier
+     * @param {function} record
+     * @param {function} before
+     * @param {function} after
+     * @return void
+     */
+    executeMapping(prefix, code, modifier, record = undefined, before = undefined, after = undefined) {
+        if (isFunction(before)) {
+            before();
+        }
+
+        const keymapping = this.#keymap[code];
+
+        if (!keymapping) {
+            this.#logger.log(this.executeMapping, `No keymapping found for code ${code}.`);
+            return;
+        }
+
+        const action = keymapping.actions[modifier];
+
+        if (!action) {
+            this.#logger.log(this.executeMapping, `No action found for code ${code} and modifier ${modifier}.`);
+            return;
+        }
+
+        if (!isFunction(action)) {
+            this.#logger.log(this.executeMapping, `INVALID action found for code ${code} and modifier ${modifier}!`);
+            return;
+        }
+
+        if (isFunction(record)) {
+            record();
+        }
+
+        action.call(this.#controller, prefix);
+
+        if (isFunction(after)) {
+            after();
+        }
+    }
+
+    /**
      * @param {number|string} code
      * @param {string} name
      * @return {KeyboardHandler} The instance of the class for chaining method calls.
-     * @todo
-     * Currently, `codeNumber` can be either a string or a number.
+     * @todo Currently, `code` can be either a string or a number.
      * A string is used for a "chord" of keys (e.g. 'gg'), and that's
      * implemented in a weird manner.
      * The most direct fix would be changing this argument to a `Array<number>`
@@ -77,21 +133,6 @@ export class KeyboardHandler {
 
         this.#fluentKeyCode = code;
 
-        return this;
-    }
-
-    /**
-     * Attempt to reimplement {@link action} in a more sound manner
-     *
-     * @param {Function<VimController>} action
-     * @param {number} modifier
-     */
-    action(action, modifier = MODIFIER.NONE) {
-        if (!this.#fluentKeyCode) {
-            return undefined;
-        }
-
-        this.#keymap[this.#fluentKeyCode].actions[modifier] = action;
         return this;
     }
 
@@ -128,73 +169,29 @@ export class KeyboardHandler {
         this.#keymap[this.#fluentKeyCode].record = value;
         return this;
     }
-
-    /**
-     * @param {number} prefix
-     * @param {number|string} code
-     * @param {number} modifier
-     * @param {function} record
-     * @param {function} before
-     * @param {function} after
-     * @return void
-     */
-    executeMapping(prefix, code, modifier, record = undefined, before = undefined, after = undefined) {
-        if (isFunction(before)) {
-            before();
-        }
-
-        const keymapping = this.#keymap[code];
-
-        if (!keymapping) {
-            this.#logger.log(`No keymapping found for code ${code}.`);
-            return;
-        }
-
-        const action = keymapping.actions[modifier];
-
-        if (!action) {
-            this.#logger.log(`No action found for code ${code} and modifier ${modifier}.`);
-            return;
-        }
-
-        if (!isFunction(action)) {
-            this.#logger.log(`INVALID action found for code ${code} and modifier ${modifier}!`);
-            return;
-        }
-
-        if (isFunction(record)) {
-            record();
-        }
-
-        keymapping.actions.call(this.#controller);
-
-        if (isFunction(after)) {
-            after();
-        }
-    }
 }
 
 class Keymapping {
-    /** @type string */
-    #name;
-
+    /** @type {Object<number, Function<VimController,number>>} */
+    #actions = {};
     /** @type number */
     #mode = 0;
-
+    /** @type string */
+    #name;
     /** @type boolean */
     #record = false;
 
-    /** @type {Object<number, Function<VimController>>} */
-    #actions = {};
-
-    get name() { return this.#name; }
-    set name(value) { this.#name = value; }
+    get actions() { return this.#actions; }
 
     get mode() { return this.#mode; }
+
     set mode(value) { this.#mode = value; }
 
-    get record() { return this.#record; }
-    set record(value) { this.#record = value; }
+    get name() { return this.#name; }
 
-    get actions() { return this.#actions; }
+    set name(value) { this.#name = value; }
+
+    get record() { return this.#record; }
+
+    set record(value) { this.#record = value; }
 }

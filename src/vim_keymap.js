@@ -1,4 +1,3 @@
-import {KeyboardHandler} from './keyboard_handler';
 import {MODIFIER, VIM_MODE} from './globals';
 
 /**
@@ -9,121 +8,117 @@ import {MODIFIER, VIM_MODE} from './globals';
  * By making the keymap more "strongly typed", I managed to identify a missing
  * implementation {@link VimController#shiftX}, which is required for executing
  * the `<S-x>` command (normal and visual modes)
- * @todo
- * Duplication in `codeName` arguments on {@link KeyboardHandler#map} and
- * {@link KeyboardHandler#action} calls
  *
- * @param keyboardHandler
- * @param {KeyboardHandler}keyboardHandler
+ * @param {KeyboardHandler}h
+ * @param {VimController}c
  */
-export function loadKeymap(keyboardHandler) {
+export function bindKeymap(h, c) {
     // ---------------------------
     // System feature keys
     // ---------------------------
 
-    keyboardHandler.map(35, 'End').action(c => c.moveToCurrentLineTail);
-    keyboardHandler.map(36, 'Home').action(c => c.moveToCurrentLineHead);
-    keyboardHandler.map(37, 'Left').action(c => c.selectPrevCharacter);
-    keyboardHandler.map(38, 'Up').action(c => c.selectPrevLine);
-    keyboardHandler.map(39, 'Right').action(c => c.selectNextCharacter);
-    keyboardHandler.map(40, 'Down').action(c => c.selectNextLine);
-    keyboardHandler.map(45, 'Insert').action(c => c.insert);
-    keyboardHandler.map(46, 'Delete').action(c => c.delCharAfter).record(true);
+    h.map(35, 'End').action(() => c.moveToCurrentLineTail());
+    h.map(36, 'Home').action(() => c.moveToCurrentLineHead());
+    h.map(37, 'Left').action(() => c.selectPreviousChar());
+    h.map(38, 'Up').action(() => c.selectPreviousLine());
+    h.map(39, 'Right').action(() => c.selectNextChar());
+    h.map(40, 'Down').action(() => c.selectNextLine());
+    h.map(45, 'Insert').action(() => c.insert());
+    h.map(46, 'Delete').action(n => c.deleteCharAfter(n)).record(true);
 
     // ---------------------------
     // VimEditor feature keys
     // ---------------------------
 
     // 0: move to current line head
-    keyboardHandler.map(48, '0').action(c => c.moveToCurrentLineHead);
+    h.map(48, '0').action(() => c.moveToCurrentLineHead());
 
     // $: move to current line tail
-    keyboardHandler.map(52, '4').action(c => c.moveToCurrentLineTail, MODIFIER.SHIFT);
+    h.map(52, '4').action(() => c.moveToCurrentLineTail(), MODIFIER.SHIFT);
 
     // insertAtLineEnd
-    keyboardHandler.map(65, 'a')
-        .action(c => c.append)
-        .action(c => c.appendLineTail, MODIFIER.SHIFT);
+    h.map(65, 'a')
+        .action(() => c.append())
+        .action(() => c.appendLineTail(), MODIFIER.SHIFT);
 
     // insertAtLineStart
-    keyboardHandler.map(73, 'i')
-        .action(c => c.insert)
-        .action(c => c.insertLineHead, MODIFIER.SHIFT);
+    h.map(73, 'i')
+        .action(() => c.insert())
+        .action(() => c.insertLineHead(), MODIFIER.SHIFT);
 
     // new line
-    keyboardHandler.map(79, 'o')
-        .action(c => c.appendNewLine)
-        .action(c => c.insertNewLine, MODIFIER.SHIFT)
+    h.map(79, 'o')
+        .action(() => c.appendNewLine())
+        .action(() => c.insertNewLine(), MODIFIER.SHIFT)
         .record(true);
 
     // replace
-    keyboardHandler.map(82, 'r').action(c => c.replaceChar);
+    h.map(82, 'r').action(() => c.replaceChar());
 
     // down
-    keyboardHandler.map(13, 'enter').action(c => c.selectNextLine);
-    keyboardHandler.map(74, 'j').action(c => c.selectNextLine);
+    h.map(13, 'enter').action(() => c.selectNextLine());
+    h.map(74, 'j').action(() => c.selectNextLine());
 
     // up
-    keyboardHandler.map(75, 'k').action(c => c.selectPrevLine);
+    h.map(75, 'k').action(() => c.selectPreviousLine());
 
     // left
-    keyboardHandler.map(72, 'h').action(c => c.selectPrevCharacter);
+    h.map(72, 'h').action(() => c.selectPreviousChar());
 
     // right
-    keyboardHandler.map(76, 'l').action(c => c.selectNextCharacter);
+    h.map(76, 'l').action(() => c.selectNextChar());
 
     // paste
-    keyboardHandler.map(80, 'p')
-        .action(c => c.pasteAfter)
-        .action(c => c.pasteBefore, MODIFIER.SHIFT)
+    h.map(80, 'p')
+        .action(() => c.pasteAfter())
+        .action(() => c.pasteBefore(), MODIFIER.SHIFT)
         .record(true);
 
     // back
-    keyboardHandler.map(85, 'u').action(c => c.backToHistory);
+    h.map(85, 'u').action(() => c.undo());
 
     // copy char
-    keyboardHandler.map(89, 'y').action(c => c.copy).mode(VIM_MODE.VISUAL);
-    keyboardHandler.map('89_89', 'yy').action(c => c.copyCurrentLine);
+    h.map(89, 'y').action(() => c.copy()).mode(VIM_MODE.VISUAL);
+    h.map('89_89', 'yy').action(() => c.copyCurrentLine());
 
     // v
-    keyboardHandler.map(86, 'v')
-        .action(c => c.switchModeToVisual)
-        .action(c => c.switchModeToVisual, MODIFIER.SHIFT);
+    h.map(86, 'v')
+        .action(() => c.switchModeToVisual())
+        .action(() => c.switchModeToVisual(), MODIFIER.SHIFT);
 
     // delete character
-    keyboardHandler.map(88, 'x')
-        .action(c => c.delCharAfter)
-        .action(c => c.shiftX, MODIFIER.SHIFT) // TODO: was missing, must test new implementation
+    h.map(88, 'x')
+        .action(n => c.deleteCharAfter(n))
+        .action(() => c.shiftX(), MODIFIER.SHIFT) // TODO: was missing, must test new implementation
         .record(true);
 
     // delete selected char in visual mode
-    keyboardHandler.map(68, 'd')
-        .action(c => c.delCharAfter)
+    h.map(68, 'd')
+        .action(n => c.deleteCharAfter(n))
         .mode(VIM_MODE.VISUAL)
         .record(true);
 
     // delete line
-    keyboardHandler.map('68_68', 'dd')
-        .action(c => c.delCurrLine)
+    h.map('68_68', 'dd')
+        .action(n => c.deleteCurrentLine(n))
         .record(true);
 
     // G
-    keyboardHandler.map(71, 'g')
-        .action(c => c.moveToLastLine, MODIFIER.SHIFT);
+    h.map(71, 'g').action(() => c.moveToLastLine(), MODIFIER.SHIFT);
 
     // gg
-    keyboardHandler.map('71_71', 'gg').action(c => c.moveToFirstLine);
+    h.map('71_71', 'gg').action(() => c.moveToFirstLine());
 
     // move to next word
-    keyboardHandler.map(87, 'w')
-        .action(c => c.moveToNextWord)
-        .action(c => c.moveToNextWord, MODIFIER.SHIFT);
+    h.map(87, 'w')
+        .action(() => c.moveToNextWord())
+        .action(() => c.moveToNextWord(), MODIFIER.SHIFT);
 
     // copy word
-    keyboardHandler.map('89_87', 'yw').action(c => c.copyWord);
+    h.map('89_87', 'yw').action(() => c.copyWord());
 
     // delete one word
-    keyboardHandler.map('68_87', 'dw')
-        .action(c => c.deleteWord)
+    h.map('68_87', 'dw')
+        .action(() => c.deleteWord())
         .record(true);
 }

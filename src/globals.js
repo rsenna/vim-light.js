@@ -11,8 +11,8 @@ export const FIND_SYMBOL = /[^\w\u4e00-\u9fa5]/;
 export const FIND_ID = /[\w\u4e00-\u9fa5]/;
 
 export const VIM_MODE = Object.freeze({
-    GENERAL: 1,
-    EDIT: 2,
+    NORMAL: 1,
+    INSERT: 2,
     VISUAL: 3,
     COMMAND: 4, // TODO: currently unused
 });

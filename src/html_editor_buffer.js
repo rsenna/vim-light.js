@@ -1,12 +1,10 @@
-import {VimEditor} from './vim_editor';
-import {VimController} from './vim_controller';
 import {
-    ID_REGEX_1,
-    ID_REGEX_2,
     CR_CHAR,
     CR_REGEX,
     FIND_ID,
     FIND_SYMBOL,
+    ID_REGEX_1,
+    ID_REGEX_2,
     SYMBOL_REGEX_1,
     SYMBOL_REGEX_2,
 } from './globals';
@@ -17,12 +15,11 @@ import {
  * Represents a unified "text buffer" for client classes, abstracting the
  * underlying medium: an HTML element, either {@link HTMLInputElement} or
  * {@link HTMLTextAreaElement}.
- * @todo
- * - There's considerable feature overlap between this class and both
- *   {@Link VimController} and {@link VimEditor}, we need to improve on that.
- * - Support multiple cursors.
- * - Extract a generic interface, so other "text buffers" are possible
- *   e.g.`InMemoryEditorBuffer`, `HTMLCanvasEditorBuffer`, etc.
+ * @todo There's considerable feature overlap between this class and both
+ *       {@Link VimController} and {@link VimEditor}
+ * @todo Support multiple cursors.
+ * @todo Extract a generic interface, so other "text buffers" are possible
+ *       e.g.`InMemoryEditorBuffer`, `HTMLCanvasEditorBuffer`, etc.
  */
 export class HTMLEditorBuffer {
     /** @type {HTMLInputElement|HTMLTextAreaElement} */
@@ -35,6 +32,153 @@ export class HTMLEditorBuffer {
     /** @param {string} text
      * @public */
     set text(text) { this.#field.value = text; }
+
+    /**
+     *
+     * @param {number} position
+     * @param {string} char
+     * @return {number}
+     * @private
+     */
+    #findCharBefore(position, char) {
+        const text = this.text;
+
+        for (let i = position - 1; i >= 0; i--) {
+            if (text.charAt(i) === char) {
+                return i + 1;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     *
+     * @param {number} position
+     * @param {RegExp} pattern
+     * @param {RegExp|undefined} andPattern
+     * @return {number}
+     * @private
+     */
+    #findExpressionAfter = (
+        position,
+        pattern,
+        andPattern = undefined,
+    ) => {
+        const text = this.text;
+
+        // And conditions
+        for (let i = position; i < text.length; i++) {
+            if (pattern.test(text.charAt(i))) {
+                if (!andPattern || andPattern.test(text.charAt(i))) {
+                    return i;
+                }
+
+            }
+        }
+
+        return text.length;
+    };
+
+    /**
+     * Parse and get current word`s last character`s right position,
+     * and in other word, get the next word`s first character`s left position
+     * @param {RegExp|undefined} currentCharType
+     * @param {number} position
+     * @return {number}
+     * @private
+     */
+    #getLastCharPosition(currentCharType, position) {
+        if (currentCharType) {
+            // Get first invisible character position
+            const firstInvisible = this.#findExpressionAfter(position, /\s/);
+
+            // Get first visible character which after first invisible space
+            const firstVisible = this.#findExpressionAfter(firstInvisible, /\S/);
+
+            // Get position
+            const lastCharPosition = this.#findExpressionAfter(position, currentCharType, /\S/);
+
+            return lastCharPosition - position < firstInvisible - position
+                ? lastCharPosition
+                : firstVisible;
+        }
+
+        // Get any visible symbol`s position
+        return this.#findExpressionAfter(position, /\S/);
+    }
+
+    /**
+     *
+     * @param {string}char
+     * @return {RegExp|undefined}
+     * @remarks
+     * This is bound to Vim's definition of a word. From Vim's `:help :word`:
+     * > A word consists of a sequence of letters, digits and underscores, or a
+     * > sequence of other non-blank characters, separated with white space
+     * > (spaces, tabs, <EOL>). [...] An empty line is also considered to be a
+     * > word.
+     * @private
+     * @todo This is Vim specific, should be moved to {@link VimController}
+     */
+    #getWordLimitRegEx(char) {
+        // Given that
+        // - An `i` (identifier) char is a letter, a digit or an underscore
+        // - A `s` (symbol) char is any other non-blank char
+        // - A `w` (whitespace) char is a tab, space or other blank chars
+
+        if (ID_REGEX_1.test(char) && ID_REGEX_2.test(char)) {
+            // If it's an `i` char, then we look for a `w or `s` char next:
+            return FIND_SYMBOL;
+        }
+
+        if (SYMBOL_REGEX_1.test(char) && SYMBOL_REGEX_2.test(char)) {
+            // If it's an 's' char, then we look for a `w` or `i` char next:
+            return FIND_ID;
+        }
+
+        return undefined;
+    }
+
+    /**
+     *
+     * @param {boolean} atEnd
+     * @param {string} text
+     * @param {number} position
+     * @param {boolean} paste
+     * @param {boolean} isNewLine
+     * @return {void}
+     * @private
+     */
+    #insertAtLineStartOrEnd(
+        atEnd,
+        text,
+        position,
+        paste,
+        isNewLine,
+    ) {
+        const originalText = this.text;
+
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        this.text = originalText.slice(0, position) +
+            text +
+            originalText.slice(position, originalText.length);
+
+        if (!paste) {
+            this.select(position, position + text.length);
+        } else if (atEnd && isNewLine && position) {
+            this.select(position + 1, position + 2);
+        } else if (!atEnd && isNewLine) {
+            this.select(position, position + 1);
+        } else {
+            this.select(position + text.length, position + text.length - 1);
+        }
+
+        this.#field.focus();
+    }
 
     /**
      *
@@ -151,6 +295,22 @@ export class HTMLEditorBuffer {
      * @public
      * @todo Move to ???
      */
+    getLengthFromLineStart(position) {
+        position = position === undefined
+            ? this.getCursorPosition()
+            : position;
+
+        const start = this.getLineStart(position);
+        return position - start + 1;
+    }
+
+    /**
+     *
+     * @param {number|undefined} position
+     * @return {number}
+     * @public
+     * @todo Move to ???
+     */
     getLengthToLineEnd(position = undefined) {
         position = position === undefined
             ? this.getCursorPosition()
@@ -162,22 +322,6 @@ export class HTMLEditorBuffer {
 
         const end = this.#findExpressionAfter(position, CR_REGEX);
         return end || this.text.length;
-    }
-
-    /**
-     *
-     * @param {number|undefined} position
-     * @return {number}
-     * @public
-     * @todo Move to ???
-     */
-    getLengthFromLineStart(position) {
-        position = position === undefined
-            ? this.getCursorPosition()
-            : position;
-
-        const start = this.getLineStart(position);
-        return position - start + 1;
     }
 
     /**
@@ -276,19 +420,6 @@ export class HTMLEditorBuffer {
 
     /**
      *
-     * @return {number}
-     * @public
-     */
-    getSelectionEnd() {
-        if (document.selection) {
-            this.#field.focus();
-        }
-
-        return this.#field.selectionEnd;
-    }
-
-    /**
-     *
      * @return {string}
      * @public
      */
@@ -298,6 +429,19 @@ export class HTMLEditorBuffer {
             : this.#field.value.substring(this.#field.selectionStart, this.#field.selectionEnd);
 
         return text + '';
+    }
+
+    /**
+     *
+     * @return {number}
+     * @public
+     */
+    getSelectionEnd() {
+        if (document.selection) {
+            this.#field.focus();
+        }
+
+        return this.#field.selectionEnd;
     }
 
     /**
@@ -331,7 +475,7 @@ export class HTMLEditorBuffer {
 
         return [
             position,
-            lastCharPosition >= this.text.length ? undefined : lastCharPosition
+            lastCharPosition >= this.text.length ? undefined : lastCharPosition,
         ];
     }
 
@@ -379,153 +523,6 @@ export class HTMLEditorBuffer {
         end = Math.min(textLength, end);
 
         this.#field.setSelectionRange(start, end);
-        this.#field.focus();
-    }
-
-    /**
-     *
-     * @param {number} position
-     * @param {string} char
-     * @return {number}
-     * @private
-     */
-    #findCharBefore(position, char) {
-        const text = this.text;
-
-        for (let i = position - 1; i >= 0; i--) {
-            if (text.charAt(i) === char) {
-                return i + 1;
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     *
-     * @param {number} position
-     * @param {RegExp} pattern
-     * @param {RegExp|undefined} andPattern
-     * @return {number}
-     * @private
-     */
-    #findExpressionAfter = (
-        position,
-        pattern,
-        andPattern = undefined
-    ) => {
-        const text = this.text;
-
-        // And conditions
-        for (let i = position; i < text.length; i++) {
-            if (pattern.test(text.charAt(i))) {
-                if (!andPattern || andPattern.test(text.charAt(i))) {
-                    return i;
-                }
-
-            }
-        }
-
-        return text.length;
-    };
-
-    /**
-     * Parse and get current word`s last character`s right position,
-     * and in other word, get the next word`s first character`s left position
-     * @param {RegExp|undefined} currentCharType
-     * @param {number} position
-     * @return {number}
-     * @private
-     */
-    #getLastCharPosition(currentCharType, position) {
-        if (currentCharType) {
-            // Get first invisible character position
-            const firstInvisible = this.#findExpressionAfter(position, /\s/);
-
-            // Get first visible character which after first invisible space
-            const firstVisible = this.#findExpressionAfter(firstInvisible, /\S/);
-
-            // Get position
-            const lastCharPosition = this.#findExpressionAfter(position, currentCharType, /\S/);
-
-            return lastCharPosition - position < firstInvisible - position
-                ? lastCharPosition
-                : firstVisible;
-        }
-
-        // Get any visible symbol`s position
-        return this.#findExpressionAfter(position, /\S/);
-    }
-
-    /**
-     *
-     * @param {string}char
-     * @return {RegExp|undefined}
-     * @remarks
-     * This is bound to Vim's definition of a word. From Vim's `:help :word`:
-     * > A word consists of a sequence of letters, digits and underscores, or a
-     * > sequence of other non-blank characters, separated with white space
-     * > (spaces, tabs, <EOL>). [...] An empty line is also considered to be a
-     * > word.
-     * @private
-     * @todo This is Vim specific, should be moved to {@link VimController}
-     */
-    #getWordLimitRegEx(char) {
-        // Given that
-        // - An `i` (identifier) char is a letter, a digit or an underscore
-        // - A `s` (symbol) char is any other non-blank char
-        // - A `w` (whitespace) char is a tab, space or other blank chars
-
-        if (ID_REGEX_1.test(char) && ID_REGEX_2.test(char)) {
-            // If it's an `i` char, then we look for a `w or `s` char next:
-            return FIND_SYMBOL;
-        }
-
-        if (SYMBOL_REGEX_1.test(char) && SYMBOL_REGEX_2.test(char)) {
-            // If it's an 's' char, then we look for a `w` or `i` char next:
-            return FIND_ID;
-        }
-
-        return undefined;
-    }
-
-    /**
-     *
-     * @param {boolean} atEnd
-     * @param {string} text
-     * @param {number} position
-     * @param {boolean} paste
-     * @param {boolean} isNewLine
-     * @return {void}
-     * @private
-     */
-    #insertAtLineStartOrEnd(
-        atEnd,
-        text,
-        position,
-        paste,
-        isNewLine
-    ) {
-        const originalText = this.text;
-
-        position = position === undefined
-            ? this.getCursorPosition()
-            : position;
-
-        this.text = originalText.slice(0, position) +
-            text +
-            originalText.slice(position, originalText.length);
-
-        if (!paste) {
-            this.select(position, position + text.length);
-        } else if (atEnd && isNewLine && position) {
-            this.select(position + 1, position + 2);
-        } else if (!atEnd && isNewLine) {
-            this.select(position, position + 1);
-        } else {
-            this.select(position + text.length, position + text.length - 1);
-        }
-
         this.#field.focus();
     }
 }

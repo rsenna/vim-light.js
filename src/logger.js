@@ -1,8 +1,11 @@
+delete globalThis["use strict"];
+
+// eslint-disable-next-line no-unused-vars
 import {Config} from './config';
-import {getCurrentTime} from './globals';
 
 // TODO: "too OOP", could be way simpler
 // TODO: should not generate any code in production mode
+// TODO: create CLI logger using some sort of middleware
 
 /**
  * Basic interface and dummy logger
@@ -10,16 +13,18 @@ import {getCurrentTime} from './globals';
 export class Logger {
     /**
      *
-     * @param {Object} message
+     * @param {Function} callee
+     * @param {Object} payload
      * @param {boolean} force
      */
-    log(message, force = false) {}
+    // eslint-disable-next-line no-unused-vars
+    log(callee, payload, force = false) {}
 }
 
 /**
- * Console logger
+ * Browser logger
  */
-export class ConsoleLogger extends Logger {
+export class BrowserLogger extends Logger {
     /** @type {boolean} */
     #debug = false;
 
@@ -31,12 +36,19 @@ export class ConsoleLogger extends Logger {
 
     /**
      *
-     * @param {Object} message
+     * @param {Function} callee
+     * @param {Object} payload
      * @param {boolean} force
      */
-    log(message, force = false) {
+    log(callee, payload, force = false) {
+        const timestamp = new Date().toISOString();
+        const calleeName = callee.name;
+        const message = typeof payload === 'string'
+            ? payload
+            : JSON.stringify(payload);
+
         if (force || this.#debug) {
-            console.log(`[${getCurrentTime()}] [$(arguments.callee.name)] ${message}`);
+            console.log(`[${calleeName}] [${timestamp}] ${message}`);
         }
     }
 }
