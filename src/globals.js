@@ -17,13 +17,20 @@ export const VIM_MODE = Object.freeze({
     COMMAND: 4, // TODO: currently unused
 });
 
+export const MODIFIER = Object.freeze({
+    NONE: 0,
+    SHIFT: 1,
+    ALT: 2,
+    CTRL: 3,
+});
+
 export const ERROR_MESSAGE = 'Execution failure! Please use the vim ' +
     'instructions in the English input method.';
 
 /**
  *
  * @param {KeyboardEvent} event
- * @returns {number}
+ * @returns {number|string}
  */
 export const getCode = (event) =>
     event.keyCode || event.which || event.charCode || event.code || event.key;
@@ -47,6 +54,7 @@ export const indexOf = (array, key) =>
 export const isFunction = fn =>
     fn && typeof fn === 'function';
 
+// TODO: should not generate any code in production mode
 export const showMsg = (msg, code) =>
     alert(msg + ' code: ' + code);
 

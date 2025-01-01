@@ -1,60 +1,61 @@
 import {VimController} from './vim_controller';
-import {isFunction} from './globals';
-
-class KeyboardItem {
-    /** @type string */
-    #name;
-
-    /** @type number */
-    #mode = 0;
-
-    /** @type boolean */
-    #record = false;
-
-    /** @type {Function<VimController>} */
-    #action = undefined;
-
-    get name() { return this.#name; }
-    set name(value) { this.#name = value; }
-
-    get mode() { return this.#mode; }
-    set mode(value) { this.#mode = value; }
-
-    get record() { return this.#record; }
-    set record(value) { this.#record = value; }
-
-    get action() { return this.#action; }
-    set action(value) { this.#action = value; }
-}
+import {isFunction, MODIFIER} from './globals';
 
 export class KeyboardHandler {
     /** @type {VimController} */
     #controller;
 
-    /** @type {number|undefined} */
-    #currentCodeNumber = undefined;
+    /** @type {Logger} */
+    #logger;
 
-    /** @type {Object<number, KeyboardItem>} */
+    /**
+     * Current key code
+     * Used to implement the "fluent DSL", which is currently consumed by
+     * vim_keymap.js
+     *
+     * @type {number|string}
+     */
+    #fluentKeyCode = undefined;
+
+    /**
+     * The complete keymap used by this editor
+     * @remarks
+     * A keymap is a collection of _keymappings_ (key-codes) and their
+     * associated behaviour
+     * @todo DSL can be implemented in a more sound manner:
+     *       Instead of accessing the keymap directly, the fluent DSL
+     *       should return a "context object" after each call,
+     *       that can be used to further modify the keymap
+     *       in a way that is not dependent of KeyboardHandler internal state
+     *       (i.e. #fluentKeyCode could be removed).
+     *
+     * @private
+     * @type {Object<number|string, Keymapping>}
+     */
     #keymap = {};
 
     /**
-     * Retrieve the current keymapping, associating key-codes and behaviour
+     * Retrieve the current, complete keymap
+     * @todo We should have a method that returns a single keymapping, instead
+     *       of exposing the whole keymap
      *
-     * @return {Object<string, KeyboardItem>}
+     * @return {Object<number|string, Keymapping>}
      */
     get keymap() { return this.#keymap; }
 
     /**
      *
+     * @param {Logger} logger
      * @param {VimController} controller
      */
-    constructor(controller) {
+    constructor(logger, controller) {
+        this.#logger = logger;
         this.#controller = controller;
     }
 
     /**
-     * @param {number|string} codeNumber
-     * @param {string} codeName
+     * @param {number|string} code
+     * @param {string} name
      * @return {KeyboardHandler} The instance of the class for chaining method calls.
      * @todo
      * Currently, `codeNumber` can be either a string or a number.
@@ -63,54 +64,34 @@ export class KeyboardHandler {
      * The most direct fix would be changing this argument to a `Array<number>`
      * instead, but I'm not sure about the impact yet.
      */
-    code(codeNumber, codeName) {
-        if (!this.#keymap[codeNumber]) {
-            this.#keymap[codeNumber] = new KeyboardItem();
+    map(code, name) {
+        if (!this.#keymap[code]) {
+            this.#keymap[code] = new Keymapping();
         }
 
-        const item = this.#keymap[codeNumber];
+        const keymapping = this.#keymap[code];
 
-        item.name = codeName;
-        item.mode = undefined;
-        item.record = false;
+        keymapping.name = name;
+        keymapping.mode = undefined;
+        keymapping.record = false;
 
-        this.#currentCodeNumber = codeNumber;
+        this.#fluentKeyCode = code;
 
-        return this;
-    }
-
-    /**
-     * Registers a method name under the specified name for the current code context.
-     *
-     * @param {string} codeName - The name to associate with the method.
-     * @param {string} methodName - The method name to be registered.
-     * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
-     * @deprecated
-     */
-    action(codeName, methodName) {
-        if (!this.#currentCodeNumber) {
-            return undefined;
-        }
-
-        // TODO: This takes a `KeyboardItem` with the `#currentCodeNumber`, and then
-        //       **adds a new property `codeName`** to it, containing the `methodName`!
-        //       very cumbersome and not very practical... (but it seems to work)
-        this.#keymap[this.#currentCodeNumber][codeName] = methodName;
         return this;
     }
 
     /**
      * Attempt to reimplement {@link action} in a more sound manner
      *
-     * @param {string} codeName
      * @param {Function<VimController>} action
+     * @param {number} modifier
      */
-    actionEx(codeName, action) {
-        if (!this.#currentCodeNumber) {
+    action(action, modifier = MODIFIER.NONE) {
+        if (!this.#fluentKeyCode) {
             return undefined;
         }
 
-        this.#keymap[this.#currentCodeNumber].action = action;
+        this.#keymap[this.#fluentKeyCode].actions[modifier] = action;
         return this;
     }
 
@@ -122,11 +103,11 @@ export class KeyboardHandler {
      * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      */
     mode(mode) {
-        if (!this.#currentCodeNumber) {
+        if (!this.#fluentKeyCode) {
             return undefined;
         }
 
-        this.#keymap[this.#currentCodeNumber].mode = mode;
+        this.#keymap[this.#fluentKeyCode].mode = mode;
         return this;
     }
 
@@ -137,17 +118,18 @@ export class KeyboardHandler {
      * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      */
     record(isRecord) {
-        if (!this.#currentCodeNumber) {
+        if (!this.#fluentKeyCode) {
             return undefined;
         }
 
-        this.#keymap[this.#currentCodeNumber].record = isRecord;
+        this.#keymap[this.#fluentKeyCode].record = isRecord;
         return this;
     }
 
     /**
-     * @param {string} code
-     * @param {string} key
+     * @param {number} prefix
+     * @param {number|string} code
+     * @param {number} modifier
      * @param {function} record
      * @param {function} before
      * @param {function} after
@@ -155,20 +137,26 @@ export class KeyboardHandler {
      * @todo This doesn't do much since it's the result of refactoring.
      *       Should probably be removed.
      */
-    executeActionEx(code, key, record = undefined, before = undefined, after = undefined) {
+    executeActionEx(prefix, code, modifier, record = undefined, before = undefined, after = undefined) {
         if (isFunction(before)) {
             before();
         }
 
-        const routerItem = this.#keymap[code];
+        const keymapping = this.#keymap[code];
 
-        if (routerItem && routerItem[key]) {
+        if (!keymapping) {
+            this.#logger.log(`No keymapping found for code ${code}`);
+        }
+
+        const action = keymapping.actions[modifier];
+
+        if (keymapping && keymapping.actions[modifier]) {
             if (isFunction(record)) {
                 record();
             }
 
-            if (isFunction(routerItem.action)) {
-                routerItem.action.call(this.#controller);
+            if (isFunction(keymapping.actions)) {
+                keymapping.actions.call(this.#controller, );
             }
 
             if (isFunction(after)) {
@@ -176,4 +164,29 @@ export class KeyboardHandler {
             }
         }
     }
+}
+
+class Keymapping {
+    /** @type string */
+    #name;
+
+    /** @type number */
+    #mode = 0;
+
+    /** @type boolean */
+    #record = false;
+
+    /** @type {Object<number, Function<VimController>>} */
+    #actions = {};
+
+    get name() { return this.#name; }
+    set name(value) { this.#name = value; }
+
+    get mode() { return this.#mode; }
+    set mode(value) { this.#mode = value; }
+
+    get record() { return this.#record; }
+    set record(value) { this.#record = value; }
+
+    get actions() { return this.#actions; }
 }

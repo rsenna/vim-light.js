@@ -1,22 +1,16 @@
 import {Config} from './config';
-import {VimController, UndoItem} from './vim_controller';
-import {KeyboardHandler} from './keyboard_handler';
 import {HTMLEditorBuffer} from './html_editor_buffer';
+import {KeyboardHandler} from './keyboard_handler';
+import {ConsoleLogger, Logger} from './logger';
+import {UndoItem, VimController} from './vim_controller';
 import {VimEditor} from './vim_editor';
-import {setupKeybindings} from './vim_keybindings.js';
-import {
-    ENTER,
-    ERROR_MESSAGE,
-    getCode,
-    getCurrentTime,
-    indexOf,
-    isFunction,
-    showMsg,
-    VALID_KEY_CODES,
-    VIM_MODE
-} from './globals';
+import {setupKeymap} from './vim_keymap.js';
+import {ENTER, ERROR_MESSAGE, getCode, getCurrentTime, isFunction, MODIFIER, showMsg, VALID_KEY_CODES, VIM_MODE} from './globals';
 
 export class WebEnvironment {
+    /** @type {Logger} */
+    #logger = undefined;
+
     /** @type {KeyboardHandler} */
     #keyboardHandler = undefined;
 
@@ -29,7 +23,7 @@ export class WebEnvironment {
     /** @type {HTMLEditorBuffer} */
     #htmlEditorBuffer = undefined;
 
-    /** @type {Array<HTMLInputElement|HTMLTextAreaElement>} */
+    /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
     #fields = undefined;
 
     /** @type {HTMLTextAreaElement|HTMLInputElement} */
@@ -66,27 +60,35 @@ export class WebEnvironment {
 
     /**
      * Start up web environment
-     * @param {Object}options
+     * @param {Object} options
      */
     constructor(options) {
-        this.#htmlEditorBuffer = new HTMLEditorBuffer();
-        this.#vimEditor = new VimEditor();
-        this.#vimController = new VimController(this, this.#vimEditor, this.#htmlEditorBuffer);
-        this.#keyboardHandler = new KeyboardHandler(this.#vimController);
+        this.#logger.log('Starting up...');
 
         this.#config = new Config(options);
 
-        this.log(this);
+        // TODO: should use (dummy) Logger in production - or complete remove log calls
+        this.#logger = new ConsoleLogger(this.#config);
+        this.#htmlEditorBuffer = new HTMLEditorBuffer();
+        this.#vimEditor = new VimEditor();
+        this.#vimController = new VimController(this, this.#vimEditor, this.#htmlEditorBuffer);
+        this.#keyboardHandler = new KeyboardHandler(this.#logger, this.#vimController);
+
+        this.#logger.log(this);
         this.#start();
+
+        this.#logger.log('Startup done.');
     }
 
     #start() {
-        this.#route();
+        setupKeymap(this.#keyboardHandler);
         this.#connect();
     }
 
-    #route() { setupKeybindings(this.#keyboardHandler); }
-
+    /**
+     *
+     * @param {NodeListOf<HTMLInputElement|HTMLTextAreaElement>}fields
+     */
     loadFields(fields) {
         this.#fields = fields;
         this.#currentField = fields[0];
@@ -99,7 +101,7 @@ export class WebEnvironment {
      */
     filterCode(code) {
         if (code === 229 && (this.#vimEditor.isMode(VIM_MODE.GENERAL) || this.#vimEditor.isMode(VIM_MODE.VISUAL))) {
-            this.log(ERROR_MESSAGE);
+            this.#logger.log(ERROR_MESSAGE);
             showMsg(ERROR_MESSAGE);
 
             return false;
@@ -129,7 +131,7 @@ export class WebEnvironment {
     onKeyDownHandler(event, replaced) {
         let code = getCode(event);
 
-        this.log('mode:' + this.#vimEditor.currentMode);
+        this.#logger.log(`mode: ${this.#vimEditor.currentMode}`);
 
         if (replaced) {
             this.recordText();
@@ -143,17 +145,18 @@ export class WebEnvironment {
                 code = unionCode;
             }
 
-            this.log('key code:' + code);
-            const number = this.numericPrefixParser(code);
-            this.parseRoute(number, event);
+            this.#logger.log(`key code:${code}`);
+            const prefix = this.numericPrefixParser(code);
+            this.parseKeymapping(event, prefix, code);
         }
     }
 
     /**
      *
+     * @param {FocusEvent} event
      * @param {HTMLTextAreaElement|HTMLInputElement} field
      */
-    onFieldFocus(field) {
+    onFieldFocus(event, field) {
         this.#currentField = field;
         this.#htmlEditorBuffer.attachHTMLField(field);
 
@@ -169,7 +172,7 @@ export class WebEnvironment {
 
     /**
      *
-     * @param {Event} event
+     * @param {MouseEvent} event
      */
     onFieldClick(event) {
         this.fire('reset_cursor_position', event);
@@ -183,7 +186,7 @@ export class WebEnvironment {
         const code = getCode(event);
         let replaced = false;
 
-        if (indexOf(VALID_KEY_CODES, code) !== -1) {
+        if (VALID_KEY_CODES.indexOf(code) !== -1) {
             return;
         }
 
@@ -245,16 +248,6 @@ export class WebEnvironment {
         return this;
     }
 
-    log(message, debugOverride = false) {
-        const debug = debugOverride
-            ? debugOverride
-            : this.#config.debug;
-
-        if (debug) {
-            console.log(message);
-        }
-    }
-
     repeat(action, repeatCount) {
         if (!isFunction(action)) {
             return;
@@ -307,11 +300,16 @@ export class WebEnvironment {
         }
 
         this.#undoList[key].push(data);
-        this.log(this.#undoList);
+        this.#logger.log(this.#undoList);
     }
 
     getElementIndex() {
-        return indexOf(this.#fields, this.#currentField);
+        // Note: cannot use Array.indexOf(), #fields is of type NodeListOf<>
+        for (let i = 0; i< this.#fields.length; i++) {
+            if (this.#fields[i] === this.#currentField) {
+                return i;
+            }
+        }
     }
 
     numericPrefixParser(code) {
@@ -328,7 +326,7 @@ export class WebEnvironment {
 
         if (!isNaN(digit) && digit >= 0 && digit <= 9) {
             this.#numericPrefix = this.#numericPrefix + '' + digit;
-            this.log('number:' + this.#numericPrefix);
+            this.#logger.log('number:' + this.#numericPrefix);
 
             return undefined;
         }
@@ -365,59 +363,56 @@ export class WebEnvironment {
 
     /**
      *
-     * @param code
      * @param event
+     * @param prefix
+     * @param code
      * @return {boolean}
      */
-    parseRoute(code, event) {
+    parseKeymapping(event, prefix, code) {
         if (code === 27) {
             this.#vimController.switchModeToGeneral();
             return false;
         }
 
-        const route = this.#keyboardHandler.keymap[code];
+        const keymapping = this.#keyboardHandler.keymap[code];
 
-        if (!route || !this.#vimEditor.isMode(VIM_MODE.GENERAL) && !this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
+        if (!keymapping || !this.#vimEditor.isMode(VIM_MODE.GENERAL) && !this.#vimEditor.isMode(VIM_MODE.VISUAL)) {
             return false;
         }
 
-        if (route.mode && !this.#vimEditor.isMode(route.mode)) {
+        if (keymapping.mode && !this.#vimEditor.isMode(keymapping.mode)) {
             return false;
         }
 
-        let fixedRouteName = route.name;
-
-        if (event.shiftKey) {
-            const upperCaseRouteName = fixedRouteName.toUpperCase();
-
-            if (fixedRouteName === upperCaseRouteName) {
-                fixedRouteName = 'shift_' + fixedRouteName;
-            } else {
-                fixedRouteName = upperCaseRouteName;
-            }
-        }
+        // TODO: deal with other modifiers
+        const modifier = event.shiftKey
+            ? MODIFIER.SHIFT
+            : MODIFIER.NONE;
 
         this.#keyboardHandler.executeActionEx(
+            prefix,
             code,
-            fixedRouteName,
+            modifier,
             this.recordText,
-            () => this.log(route[fixedRouteName]),
+            () => this.#logger.log(`modifier: ${modifier}, keymapping: ${keymapping}`),
             this.resetNumericPrefix)
 
         return true;
     }
 
     #connect() {
-        const fields = window.document.querySelectorAll('input, textarea');
+        /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
+        const fields = window.document
+            .querySelectorAll('input, textarea');
 
         this.loadFields(fields);
 
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
 
-            field.onfocus = this.onFieldFocus;
-            field.onclick = this.onFieldClick;
-            field.onkeydown = this.onFieldKeyDown;
+            field.onfocus = (event) => this.onFieldFocus(event, field);
+            field.onclick = (event) => this.onFieldClick(event);
+            field.onkeydown = (event) => this.onFieldKeyDown(event);
         }
 
         this.on('reset_cursor_position', this.onResetCursorPositionHandler);
