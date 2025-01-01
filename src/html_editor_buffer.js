@@ -3,8 +3,8 @@ import {VimController} from './vim_controller';
 import {
     ID_REGEX_1,
     ID_REGEX_2,
-    ENTER,
-    ENTER_REGEXP,
+    CR_CHAR,
+    CR_REGEX,
     FIND_ID,
     FIND_SYMBOL,
     SYMBOL_REGEX_1,
@@ -156,11 +156,11 @@ export class HTMLEditorBuffer {
             ? this.getCursorPosition()
             : position;
 
-        if (this.getCharAt(position) === ENTER) {
+        if (this.getCharAt(position) === CR_CHAR) {
             return position;
         }
 
-        const end = this.#findExpressionAfter(position, ENTER_REGEXP);
+        const end = this.#findExpressionAfter(position, CR_REGEX);
         return end || this.text.length;
     }
 
@@ -193,8 +193,8 @@ export class HTMLEditorBuffer {
             ? this.getCursorPosition()
             : position;
 
-        const left = this.#findCharBefore(position, ENTER);
-        const right = this.#findExpressionAfter(position, ENTER_REGEXP);
+        const left = this.#findCharBefore(position, CR_CHAR);
+        const right = this.#findExpressionAfter(position, CR_REGEX);
 
         return left === undefined
             ? right
@@ -213,7 +213,7 @@ export class HTMLEditorBuffer {
             ? this.getCursorPosition()
             : position;
 
-        const start = this.#findCharBefore(position, ENTER);
+        const start = this.#findCharBefore(position, CR_CHAR);
         return start || 0;
     }
 
@@ -228,7 +228,7 @@ export class HTMLEditorBuffer {
         const start = this.getNextLineStart(position);
         if (start === undefined) { return undefined; }
 
-        const end = this.#findExpressionAfter(start, ENTER_REGEXP);
+        const end = this.#findExpressionAfter(start, CR_REGEX);
         return end || this.text.length;
     }
 
@@ -270,7 +270,7 @@ export class HTMLEditorBuffer {
         position = this.getPreviousLineEnd(position);
         if (position === undefined) { return undefined; }
 
-        const start = this.#findCharBefore(position, ENTER);
+        const start = this.#findCharBefore(position, CR_CHAR);
         return start || 0;
     }
 

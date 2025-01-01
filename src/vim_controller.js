@@ -1,7 +1,7 @@
 import {WebEnvironment} from './web_environment';
 import {VimEditor} from './vim_editor';
 import {HTMLEditorBuffer} from './html_editor_buffer';
-import {ENTER, VIM_MODE} from './globals';
+import {CR_CHAR, VIM_MODE} from './globals';
 
 export class VimController {
     /**@type {WebEnvironment} */
@@ -88,7 +88,7 @@ export class VimController {
             this.#htmlEditorBuffer.select(start, start + 1);
         }
 
-        if (this.#htmlEditorBuffer.getCharBefore(start) === ENTER) {
+        if (this.#htmlEditorBuffer.getCharBefore(start) === CR_CHAR) {
             this.#htmlEditorBuffer.select(start, start + 1);
         }
 
@@ -123,7 +123,7 @@ export class VimController {
         this.#environment.repeat(this.#vimEditor.selectPrevLine, repeatCount);
     }
 
-    copyChar() {
+    copy() {
         this.#vimEditor.pasteNewLineRequested = false;
         this.#environment.clipboard = this.#htmlEditorBuffer.getSelectedText();
 
@@ -148,7 +148,7 @@ export class VimController {
 
         if (this.#vimEditor.pasteNewLineRequested) {
             const end = this.#htmlEditorBuffer.getLengthToLineEnd();
-            this.#htmlEditorBuffer.insertAtLineEnd(ENTER + this.#environment.clipboard, end, true, true);
+            this.#htmlEditorBuffer.insertAtLineEnd(CR_CHAR + this.#environment.clipboard, end, true, true);
         } else {
             this.#htmlEditorBuffer.insertAtLineEnd(this.#environment.clipboard, undefined, true, false);
         }
@@ -159,7 +159,7 @@ export class VimController {
 
         if (this.#vimEditor.pasteNewLineRequested) {
             const start = this.#htmlEditorBuffer.getLineStart();
-            this.#htmlEditorBuffer.insertAtLineStart(this.#environment.clipboard + ENTER, start, true, true);
+            this.#htmlEditorBuffer.insertAtLineStart(this.#environment.clipboard + CR_CHAR, start, true, true);
         } else {
             this.#htmlEditorBuffer.insertAtLineStart(this.#environment.clipboard, undefined, true, false);
         }
@@ -204,7 +204,7 @@ export class VimController {
 
     backToHistory() {
         const key = this.#environment.getElementIndex();
-        const list = this.#environment.undoList[key];
+        const list = this.#environment.undoHistory[key];
         this.#vimEditor.backToHistory(list);
     }
 

@@ -1,6 +1,6 @@
 import {HTMLEditorBuffer} from './html_editor_buffer';
 import {UndoItem} from './vim_controller';
-import {ENTER, VIM_MODE} from './globals';
+import {CR_CHAR, VIM_MODE} from './globals';
 
 /**
  * Represents a Vim Editor, bound to a {@link HTMLEditorBuffer}
@@ -14,6 +14,8 @@ import {ENTER, VIM_MODE} from './globals';
  * @see {HTMLTextAreaElement}
  */
 export class VimEditor {
+    static #VIM_MODES = Object.values(VIM_MODE);
+
     /** @type {number} */
     #currentMode = VIM_MODE.EDIT;
 
@@ -71,14 +73,12 @@ export class VimEditor {
         return this.#currentMode === mode;
     }
 
-    static vimModes = Object.values(VIM_MODE);
-
     /**
      *
      * @param {number} mode
      */
     switchModeTo(mode) {
-        if (VimEditor.vimModes.indexOf(mode) > -1) {
+        if (VimEditor.#VIM_MODES.indexOf(mode) > -1) {
             this.#currentMode = mode;
         }
     }
@@ -96,7 +96,7 @@ export class VimEditor {
 
         const nextSymbol = this.#htmlEditorBuffer.getCharAfter(position - 1);
 
-        if (!nextSymbol || nextSymbol === ENTER) {
+        if (!nextSymbol || nextSymbol === CR_CHAR) {
             this.#htmlEditorBuffer.select(position - 1, position);
         } else {
             this.#htmlEditorBuffer.select(position, position + 1);
@@ -119,11 +119,11 @@ export class VimEditor {
             ? this.#visualCursor
             : this.#htmlEditorBuffer.getCursorPosition();
 
-        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAfter(position) === ENTER) {
+        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAfter(position) === CR_CHAR) {
             return undefined;
         }
 
-        if (this.isMode(VIM_MODE.VISUAL) && this.#htmlEditorBuffer.getCharAfter(position - 1) === ENTER) {
+        if (this.isMode(VIM_MODE.VISUAL) && this.#htmlEditorBuffer.getCharAfter(position - 1) === CR_CHAR) {
             return undefined;
         }
 
@@ -190,7 +190,7 @@ export class VimEditor {
 
         let start = this.#visualStart;
 
-        if (position > start && this.#htmlEditorBuffer.getCharBefore(position - 1) === ENTER) {
+        if (position > start && this.#htmlEditorBuffer.getCharBefore(position - 1) === CR_CHAR) {
             return [undefined, position];
         }
 
@@ -222,7 +222,7 @@ export class VimEditor {
             position1 = this.#visualCursor;
         }
 
-        if (this.#htmlEditorBuffer.getCharBefore(position1) === ENTER) {
+        if (this.#htmlEditorBuffer.getCharBefore(position1) === CR_CHAR) {
             return;
         }
 
@@ -262,7 +262,7 @@ export class VimEditor {
 
         this.#visualCursor = position;
 
-        if (this.#htmlEditorBuffer.getCharAt(nextLineStart) === ENTER) {
+        if (this.#htmlEditorBuffer.getCharAt(nextLineStart) === CR_CHAR) {
 
             this.#htmlEditorBuffer.insertAtLineEnd(' ', nextLineStart);
             this.#visualCursor = ++position;
@@ -287,7 +287,7 @@ export class VimEditor {
         const [start, position] = this.#adjustNextLineVisual(nextLineStart, position1);
         this.#htmlEditorBuffer.select(start, position);
 
-        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAt(nextLineStart) === ENTER) {
+        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAt(nextLineStart) === CR_CHAR) {
             this.#htmlEditorBuffer.insertAtLineEnd(' ', nextLineStart);
         }
     }
@@ -327,7 +327,7 @@ export class VimEditor {
         if (this.isMode(VIM_MODE.VISUAL)) {
             start = this.#visualStart;
 
-            if (this.#htmlEditorBuffer.getCharBefore(position) !== ENTER && start !== position - 1 && end < start) {
+            if (this.#htmlEditorBuffer.getCharBefore(position) !== CR_CHAR && start !== position - 1 && end < start) {
                 end = position - 1;
             }
 
@@ -355,7 +355,7 @@ export class VimEditor {
 
         this.#makeLastLineSelectionVisual(position);
 
-        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAt(prevLineStart) === ENTER) {
+        if (this.isMode(VIM_MODE.GENERAL) && this.#htmlEditorBuffer.getCharAt(prevLineStart) === CR_CHAR) {
             this.#htmlEditorBuffer.insertAtLineEnd(' ', prevLineStart);
         }
     }
@@ -401,14 +401,14 @@ export class VimEditor {
     appendNewLine() {
         const position = this.#htmlEditorBuffer.getLengthToLineEnd();
 
-        this.#htmlEditorBuffer.insertAtLineEnd(ENTER + ' ', position);
+        this.#htmlEditorBuffer.insertAtLineEnd(CR_CHAR + ' ', position);
         this.#htmlEditorBuffer.select(position + 1, position + 1);
     }
 
     insertNewLine() {
         const position = this.#htmlEditorBuffer.getLineStart();
 
-        this.#htmlEditorBuffer.insertAtLineEnd(' ' + ENTER, position);
+        this.#htmlEditorBuffer.insertAtLineEnd(' ' + CR_CHAR, position);
         this.#htmlEditorBuffer.select(position, position);
     }
 

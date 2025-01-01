@@ -1,5 +1,5 @@
-export const ENTER = '\n';
-export const ENTER_REGEXP = /\n/;
+export const CR_CHAR = '\n';
+export const CR_REGEX = /\n/;
 
 export const ID_REGEX_1 = /[\w\u4e00-\u9fa5]/;
 export const ID_REGEX_2 = /[^|]/;
@@ -42,6 +42,7 @@ export const getCode = (event) =>
 export const getCurrentTime = () =>
     Date.now();
 
+// TODO: call could potentially be removed in production code
 export const isFunction = fn =>
     fn && typeof fn === 'function';
 
@@ -53,6 +54,6 @@ export const showMsg = (msg, code) =>
  * Array of valid key codes
  * @type {Array<number>}
  */
-export const VALID_KEY_CODES = [
+export const EXTRA_KEY_CODES = [
     9, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123
 ];

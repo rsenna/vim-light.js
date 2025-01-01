@@ -16,7 +16,7 @@ import {MODIFIER, VIM_MODE} from './globals';
  * @param keyboardHandler
  * @param {KeyboardHandler}keyboardHandler
  */
-export function setupKeymap(keyboardHandler) {
+export function loadKeymap(keyboardHandler) {
     // ---------------------------
     // System feature keys
     // ---------------------------
@@ -34,10 +34,10 @@ export function setupKeymap(keyboardHandler) {
     // VimEditor feature keys
     // ---------------------------
 
-    // 0:move to current line head
+    // 0: move to current line head
     keyboardHandler.map(48, '0').action(c => c.moveToCurrentLineHead);
 
-    // &:move to current line tail
+    // $: move to current line tail
     keyboardHandler.map(52, '4').action(c => c.moveToCurrentLineTail, MODIFIER.SHIFT);
 
     // insertAtLineEnd
@@ -82,7 +82,7 @@ export function setupKeymap(keyboardHandler) {
     keyboardHandler.map(85, 'u').action(c => c.backToHistory);
 
     // copy char
-    keyboardHandler.map(89, 'y').action(c => c.copyChar).mode(VIM_MODE.VISUAL);
+    keyboardHandler.map(89, 'y').action(c => c.copy).mode(VIM_MODE.VISUAL);
     keyboardHandler.map('89_89', 'yy').action(c => c.copyCurrentLine);
 
     // v

@@ -4,16 +4,16 @@ import {KeyboardHandler} from './keyboard_handler';
 import {ConsoleLogger, Logger} from './logger';
 import {UndoItem, VimController} from './vim_controller';
 import {VimEditor} from './vim_editor';
-import {setupKeymap} from './vim_keymap.js';
+import {loadKeymap} from './vim_keymap.js';
 import {
-    ENTER,
+    CR_CHAR,
     ERROR_MESSAGE,
     getCode,
     getCurrentTime,
     isFunction,
     MODIFIER,
     showMsg,
-    VALID_KEY_CODES,
+    EXTRA_KEY_CODES,
     VIM_MODE
 } from './globals';
 
@@ -42,14 +42,17 @@ export class WebEnvironment {
     /** @type {Config} */
     #config = Config;
 
+    // TODO: should be a list of registers
+    // TODO: should provide access to OS clipboard too
     /** @type {string} */
     #clipboard = undefined;
 
-    /** @type {Array} */
-    #undoList = [];
+    // TODO: should be a tree, not a list (like Vim does)
+    /** @type {Array<UndoItem>} */
+    #undoHistory = [];
 
     /** @type {number} */
-    #undoListLimit = 100;
+    #undoHistoryLimit = 100;
 
     /** @type {number|string} */
     #previousCode = undefined;
@@ -67,7 +70,7 @@ export class WebEnvironment {
 
     set clipboard(value) { this.#clipboard = value; }
 
-    get undoList() { return this.#undoList; }
+    get undoHistory() { return this.#undoHistory; }
 
     /**
      * Start up web environment
@@ -92,7 +95,7 @@ export class WebEnvironment {
     }
 
     #start() {
-        setupKeymap(this.#keyboardHandler);
+        loadKeymap(this.#keyboardHandler);
         this.#connect();
     }
 
@@ -145,7 +148,7 @@ export class WebEnvironment {
         this.#logger.log(`mode: ${this.#vimEditor.currentMode}`);
 
         if (replaced) {
-            this.recordText();
+            this.recordUndoHistory();
             return;
         }
 
@@ -197,7 +200,7 @@ export class WebEnvironment {
         const code = getCode(event);
         let replaced = false;
 
-        if (VALID_KEY_CODES.indexOf(code) !== -1) {
+        if (EXTRA_KEY_CODES.indexOf(code) !== -1) {
             return;
         }
 
@@ -217,7 +220,7 @@ export class WebEnvironment {
                 ? position - 1
                 : position;
 
-            this.recordText(undefined, newPosition);
+            this.recordUndoHistory(undefined, newPosition);
         }
 
         this.fire('input', event, replaced);
@@ -283,14 +286,14 @@ export class WebEnvironment {
             // TODO: Executed on last iteration only
             if (i === repeatCount - 1) {
                 // Remove line break char
-                lastResult = lastResult.replace(ENTER, '');
+                lastResult = lastResult.replace(CR_CHAR, '');
             }
 
             this.#clipboard += lastResult;
         }
     }
 
-    recordText(text, position) {
+    recordUndoHistory(text, position) {
         text = text === undefined
             ? this.#htmlEditorBuffer.text
             : text;
@@ -300,18 +303,18 @@ export class WebEnvironment {
             : position;
 
         const data = new UndoItem(position, text);
-        const key = this.getElementIndex();
+        const fieldIndex = this.getElementIndex();
 
-        if (!this.#undoList[key]) {
-            this.#undoList[key] = [];
+        if (!this.#undoHistory[fieldIndex]) {
+            this.#undoHistory[fieldIndex] = [];
         }
 
-        if (this.#undoList[key].length >= this.#undoListLimit) {
-            this.#undoList[key].shift();
+        if (this.#undoHistory[fieldIndex].length >= this.#undoHistoryLimit) {
+            this.#undoHistory[fieldIndex].shift();
         }
 
-        this.#undoList[key].push(data);
-        this.#logger.log(this.#undoList);
+        this.#undoHistory[fieldIndex].push(data);
+        this.#logger.log(this.#undoHistory);
     }
 
     getElementIndex() {
@@ -400,11 +403,11 @@ export class WebEnvironment {
             ? MODIFIER.SHIFT
             : MODIFIER.NONE;
 
-        this.#keyboardHandler.executeActionEx(
+        this.#keyboardHandler.executeMapping(
             prefix,
             code,
             modifier,
-            this.recordText,
+            this.recordUndoHistory,
             () => this.#logger.log(`modifier: ${modifier}, keymapping: ${keymapping}`),
             this.resetNumericPrefix);
 

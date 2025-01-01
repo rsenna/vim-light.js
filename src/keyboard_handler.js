@@ -113,16 +113,19 @@ export class KeyboardHandler {
 
     /**
      * Updates the record status for the current code in the internal keys object.
+     * @todo 'record' is a misnomer; this actually identifies a _destructive_
+     *       action - one that can modify the current state of the editor, and
+     *       therefore generates undo history
      *
-     * @param {boolean} isRecord - A boolean value indicating whether the current code should be marked as a record.
+     * @param {boolean} value If this mapping should be recorded into the undo history
      * @return {KeyboardHandler|undefined} The instance of the class for chaining method calls.
      */
-    record(isRecord) {
+    record(value) {
         if (!this.#fluentKeyCode) {
             return undefined;
         }
 
-        this.#keymap[this.#fluentKeyCode].record = isRecord;
+        this.#keymap[this.#fluentKeyCode].record = value;
         return this;
     }
 
@@ -134,10 +137,8 @@ export class KeyboardHandler {
      * @param {function} before
      * @param {function} after
      * @return void
-     * @todo This doesn't do much since it's the result of refactoring.
-     *       Should probably be removed.
      */
-    executeActionEx(prefix, code, modifier, record = undefined, before = undefined, after = undefined) {
+    executeMapping(prefix, code, modifier, record = undefined, before = undefined, after = undefined) {
         if (isFunction(before)) {
             before();
         }
@@ -145,23 +146,30 @@ export class KeyboardHandler {
         const keymapping = this.#keymap[code];
 
         if (!keymapping) {
-            this.#logger.log(`No keymapping found for code ${code}`);
+            this.#logger.log(`No keymapping found for code ${code}.`);
+            return;
         }
 
         const action = keymapping.actions[modifier];
 
-        if (keymapping && keymapping.actions[modifier]) {
-            if (isFunction(record)) {
-                record();
-            }
+        if (!action) {
+            this.#logger.log(`No action found for code ${code} and modifier ${modifier}.`);
+            return;
+        }
 
-            if (isFunction(keymapping.actions)) {
-                keymapping.actions.call(this.#controller, );
-            }
+        if (!isFunction(action)) {
+            this.#logger.log(`INVALID action found for code ${code} and modifier ${modifier}!`);
+            return;
+        }
 
-            if (isFunction(after)) {
-                after();
-            }
+        if (isFunction(record)) {
+            record();
+        }
+
+        keymapping.actions.call(this.#controller);
+
+        if (isFunction(after)) {
+            after();
         }
     }
 }
