@@ -1,6 +1,15 @@
-import * as globals from './globals';
 import {VimEditor} from './vim_editor';
 import {VimController} from './vim_controller';
+import {
+    ID_REGEX_1,
+    ID_REGEX_2,
+    ENTER,
+    ENTER_REGEXP,
+    FIND_ID,
+    FIND_SYMBOL,
+    SYMBOL_REGEX_1,
+    SYMBOL_REGEX_2,
+} from './globals';
 
 /**
  * Editor Buffer class
@@ -147,11 +156,11 @@ export class HTMLEditorBuffer {
             ? this.getCursorPosition()
             : position;
 
-        if (this.getCharAt(position) === globals.ENTER) {
+        if (this.getCharAt(position) === ENTER) {
             return position;
         }
 
-        const end = this.#findExpressionAfter(position, globals.ENTER_REGEXP);
+        const end = this.#findExpressionAfter(position, ENTER_REGEXP);
         return end || this.text.length;
     }
 
@@ -184,8 +193,8 @@ export class HTMLEditorBuffer {
             ? this.getCursorPosition()
             : position;
 
-        const left = this.#findCharBefore(position, globals.ENTER);
-        const right = this.#findExpressionAfter(position, globals.ENTER_REGEXP);
+        const left = this.#findCharBefore(position, ENTER);
+        const right = this.#findExpressionAfter(position, ENTER_REGEXP);
 
         return left === undefined
             ? right
@@ -204,7 +213,7 @@ export class HTMLEditorBuffer {
             ? this.getCursorPosition()
             : position;
 
-        const start = this.#findCharBefore(position, globals.ENTER);
+        const start = this.#findCharBefore(position, ENTER);
         return start || 0;
     }
 
@@ -219,7 +228,7 @@ export class HTMLEditorBuffer {
         const start = this.getNextLineStart(position);
         if (start === undefined) { return undefined; }
 
-        const end = this.#findExpressionAfter(start, globals.ENTER_REGEXP);
+        const end = this.#findExpressionAfter(start, ENTER_REGEXP);
         return end || this.text.length;
     }
 
@@ -261,7 +270,7 @@ export class HTMLEditorBuffer {
         position = this.getPreviousLineEnd(position);
         if (position === undefined) { return undefined; }
 
-        const start = this.#findCharBefore(position, globals.ENTER);
+        const start = this.#findCharBefore(position, ENTER);
         return start || 0;
     }
 
@@ -467,14 +476,14 @@ export class HTMLEditorBuffer {
         // - A `s` (symbol) char is any other non-blank char
         // - A `w` (whitespace) char is a tab, space or other blank chars
 
-        if (globals.charRegEx1.test(char) && globals.charRegEx2.test(char)) {
+        if (ID_REGEX_1.test(char) && ID_REGEX_2.test(char)) {
             // If it's an `i` char, then we look for a `w or `s` char next:
-            return globals.findSymbolChar;
+            return FIND_SYMBOL;
         }
 
-        if (globals.symbolRegEx1.test(char) && globals.symbolRegEx2.test(char)) {
+        if (SYMBOL_REGEX_1.test(char) && SYMBOL_REGEX_2.test(char)) {
             // If it's an 's' char, then we look for a `w` or `i` char next:
-            return globals.findGeneralChar;
+            return FIND_ID;
         }
 
         return undefined;

@@ -1,14 +1,14 @@
 export const ENTER = '\n';
 export const ENTER_REGEXP = /\n/;
 
-export const charRegEx1 = /[\w\u4e00-\u9fa5]/;
-export const charRegEx2 = /[^|]/;
+export const ID_REGEX_1 = /[\w\u4e00-\u9fa5]/;
+export const ID_REGEX_2 = /[^|]/;
 
-export const symbolRegEx1 = /\W/;
-export const symbolRegEx2 = /\S/;
+export const SYMBOL_REGEX_1 = /\W/;
+export const SYMBOL_REGEX_2 = /\S/;
 
-export const findSymbolChar = /[^\w\u4e00-\u9fa5]/;
-export const findGeneralChar = /[\w\u4e00-\u9fa5]/;
+export const FIND_SYMBOL = /[^\w\u4e00-\u9fa5]/;
+export const FIND_ID = /[\w\u4e00-\u9fa5]/;
 
 export const VIM_MODE = Object.freeze({
     GENERAL: 1,
@@ -41,15 +41,6 @@ export const getCode = (event) =>
  */
 export const getCurrentTime = () =>
     Date.now();
-
-/**
- *
- * @param {Array<Object>}array
- * @param {Object} key
- * @return {number}
- */
-export const indexOf = (array, key) =>
-    array.indexOf(key);
 
 export const isFunction = fn =>
     fn && typeof fn === 'function';

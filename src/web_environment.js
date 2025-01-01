@@ -5,7 +5,17 @@ import {ConsoleLogger, Logger} from './logger';
 import {UndoItem, VimController} from './vim_controller';
 import {VimEditor} from './vim_editor';
 import {setupKeymap} from './vim_keymap.js';
-import {ENTER, ERROR_MESSAGE, getCode, getCurrentTime, isFunction, MODIFIER, showMsg, VALID_KEY_CODES, VIM_MODE} from './globals';
+import {
+    ENTER,
+    ERROR_MESSAGE,
+    getCode,
+    getCurrentTime,
+    isFunction,
+    MODIFIER,
+    showMsg,
+    VALID_KEY_CODES,
+    VIM_MODE
+} from './globals';
 
 export class WebEnvironment {
     /** @type {Logger} */
@@ -54,6 +64,7 @@ export class WebEnvironment {
     #events = undefined;
 
     get clipboard() { return this.#clipboard; }
+
     set clipboard(value) { this.#clipboard = value; }
 
     get undoList() { return this.#undoList; }
@@ -305,7 +316,7 @@ export class WebEnvironment {
 
     getElementIndex() {
         // Note: cannot use Array.indexOf(), #fields is of type NodeListOf<>
-        for (let i = 0; i< this.#fields.length; i++) {
+        for (let i = 0; i < this.#fields.length; i++) {
             if (this.#fields[i] === this.#currentField) {
                 return i;
             }
@@ -395,7 +406,7 @@ export class WebEnvironment {
             modifier,
             this.recordText,
             () => this.#logger.log(`modifier: ${modifier}, keymapping: ${keymapping}`),
-            this.resetNumericPrefix)
+            this.resetNumericPrefix);
 
         return true;
     }
@@ -403,7 +414,7 @@ export class WebEnvironment {
     #connect() {
         /** @type {NodeListOf<HTMLInputElement|HTMLTextAreaElement>} */
         const fields = window.document
-            .querySelectorAll('input, textarea');
+        .querySelectorAll('input, textarea');
 
         this.loadFields(fields);
 
