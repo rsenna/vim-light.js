@@ -89,9 +89,9 @@ export class WebEnvironment {
         for (let i = 0; i < fields.length; i++) {
             const field = fields[i];
 
-            field.onfocus = (event) => this.onFieldFocus(event, field);
-            field.onclick = (event) => this.onFieldClick(event);
-            field.onkeydown = (event) => this.onFieldKeyDown(event);
+            field.onfocus = event => this.onFieldFocus(event, field);
+            field.onclick = event => this.onFieldClick(event);
+            field.onkeydown = event => this.onFieldKeyDown(event);
         }
     }
 

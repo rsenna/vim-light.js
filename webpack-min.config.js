@@ -1,6 +1,7 @@
 /* eslint no-undef: 0 */
 const path = require('path');
 const TerserPlugin = require('terser-webpack-plugin');
+const CompressionPlugin = require("compression-webpack-plugin");
 
 module.exports = {
     entry: {
@@ -17,12 +18,14 @@ module.exports = {
                     },
                     compress: {
                         // compress options
+                        arguments: true,
+                        booleans_as_integers: true,
                         drop_console: true,
                         ecma: 2015,
                         hoist_funs: true,
-                        keep_fargs: true,
+                        keep_fargs: false,
                         module: true,
-                        passes: 1, // TODO: increase later to see if it makes a difference
+                        passes: 1,
                         pure_getters: false, // TODO: check if it makes a difference
                         toplevel: true,
                         unsafe: true,
@@ -58,4 +61,12 @@ module.exports = {
         filename: 'vim-light.min.js',
         publicPath: '/build',
     },
+    plugins: [
+        new CompressionPlugin({
+            algorithm: "gzip",
+            test: /\.js$|\.css$|\.html$/,
+            threshold: 10240,
+            minRatio: 0.8
+        }),
+    ],
 };
