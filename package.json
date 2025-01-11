@@ -1,34 +1,68 @@
 {
-  "name": "vim-light.js",
-  "version": "0.0.1",
-  "description": "Simple VIM engine for the web",
-  "scripts": {
-    "dev": "webpack --watch --config webpack-dev.config.js",
-    "serve": "webpack serve --config webpack-dev.config.js",
-    "build": "webpack --config webpack-dev.config.js",
-    "build-min": "webpack --config webpack-min.config.js"
-  },
-  "keywords": [
-    "vim",
-    "vim.js",
-    "vim-light.js"
-  ],
-  "author": "rsenna",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rsenna/vim-light.js"
-  },
-  "bugs": "https://github.com/rsenna/vim-light.js/issues",
-  "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "compression-webpack-plugin": "^11.1.0",
-    "eslint": "^9.17.0",
-    "eslint-webpack-plugin": "^4.2.0",
-    "globals": "^15.14.0",
-    "terser-webpack-plugin": "^5.3.11",
-    "webpack": "^5.97.1",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.0"
-  }
+    "author": "rsenna",
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "bugs": "https://github.com/rsenna/vim-light.js/issues",
+    "description": "Simple VIM engine for the web",
+    "devDependencies": {
+        "@babel/core": "^7.26.0",
+        "@babel/preset-env": "^7.26.0",
+        "@eslint/js": "^9.17.0",
+        "@rollup/plugin-babel": "^6.0.4",
+        "@rollup/plugin-eslint": "^9.0.5",
+        "@rollup/plugin-json": "^6.1.0",
+        "@rollup/plugin-terser": "^0.4.4",
+        "@stylistic/eslint-plugin-js": "^2.12.1",
+        "compression-webpack-plugin": "^11.1.0",
+        "eslint": "^9.17.0",
+        "eslint-webpack-plugin": "^4.2.0",
+        "globals": "^15.14.0",
+        "reload": "^3.3.0",
+        "rollup": "^4.29.1",
+        "rollup-plugin-gzip": "^4.0.1",
+        "rollup-plugin-livereload": "^2.0.5",
+        "rollup-plugin-serve": "^1.1.1",
+        "terser-webpack-plugin": "^5.3.11",
+        "webpack": "^5.97.1",
+        "webpack-cli": "^6.0.1",
+        "webpack-dev-server": "^5.2.0"
+    },
+    "keywords": [
+        "vim",
+        "vim.js",
+        "vim-light.js"
+    ],
+    "license": "MIT",
+    "name": "vim-light.js",
+    "overrides": {
+        "@rollup/plugin-eslint": {
+            "eslint": "$eslint"
+        }
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/rsenna/vim-light.js"
+    },
+    "scripts": {
+        "wp-build-dev": "webpack --config webpack-dev.config.js",
+        "wp-build-min": "webpack --config webpack-min.config.js",
+        "wp-dev": "webpack --watch --config webpack-dev.config.js",
+        "wp-serve-dev": "webpack serve --config webpack-dev.config.js",
+        "wp-serve-min": "webpack serve --config webpack-min.config.js",
+        "ru-build-dev": "./node_modules/.bin/rollup -c rollup-dev.config.mjs",
+        "ru-build-min": "./node_modules/.bin/rollup -c rollup-min.config.mjs",
+        "ru-serve-dev": "./node_modules/.bin/reload -b -d ./app -p 8000 | ./node_modules/.bin/rollup -c rollup-dev.config.mjs -w",
+        "ru-serve-min": "./node_modules/.bin/reload -b -d ./app -p 8000 | ./node_modules/.bin/rollup -c rollup-min.config.mjs -w"
+    },
+    "version": "0.0.1"
 }

@@ -57,9 +57,9 @@ module.exports = {
     },
     mode: 'production',
     output: {
-        path: path.resolve('./build'),
+        path: path.resolve('./build/webpack'),
         filename: 'vim-light.min.js',
-        publicPath: '/build',
+        publicPath: '/build/webpack/',
     },
     plugins: [
         new CompressionPlugin({

@@ -39,6 +39,9 @@ export class VimEditor {
     get currentMode() { return this.#currentMode; }
 
     // unused: get htmlEditorBuffer() { return this.#htmlEditorBuffer; }
+    /**
+     * @param {HTMLEditorBuffer} value
+     */
     set htmlEditorBuffer(value) { this.#htmlEditorBuffer = value; }
 
     get pasteNewLineRequested() { return this.#pasteNewLineRequested; }

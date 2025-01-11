@@ -15,9 +15,9 @@ module.exports = {
         script: './index.js',
     },
     output: {
-        path: path.resolve('./build'),
+        path: path.resolve('./build/webpack'),
         filename: 'vim-light.js',
-        publicPath: '/build',
+        publicPath: '/build/webpack/',
     },
     plugins: [
         new ESLintPlugin({

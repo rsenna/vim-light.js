@@ -1,16 +1,21 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
+import stylisticJs from '@stylistic/eslint-plugin-js'
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
+    pluginJs.configs.recommended,
     {
+        files: ["src/*.js"],
         languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: "module",
             globals: globals.browser,
         },
+        plugins: {
+            "@stylistic/js": stylisticJs,
+        },
         rules: {
-            // note you must disable the base rule
-            // as it can report incorrect errors
-            // "no-unused-vars": "off",
             "no-unused-vars": [
                 "error",
                 {
@@ -19,7 +24,13 @@ export default [
                     "caughtErrorsIgnorePattern": "^_",
                 },
             ],
+            "@stylistic/js/indent": ["warn", 4],
+            "@stylistic/js/linebreak-style": ["warn", "unix"],
+            // "@stylistic/js/quotes": ["warn", "single", {
+            //     "avoidEscape": true,
+            //     "allowTemplateLiterals": true
+            // }],
+            "@stylistic/js/semi": ["error", "always"],
         },
     },
-    pluginJs.configs.recommended,
 ];
