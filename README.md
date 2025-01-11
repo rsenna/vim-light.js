@@ -1,37 +1,21 @@
----
-created: 2024-12-28T14:24:19+01:00
-updated: 2024-12-28T15:28:54+01:00
----
 # vim-light-js
 
-> ℹ️ This is a **fork** of an original, currently unmaintained work
+> ℹ️ This is a *cough* *cough* **blatant copy** of an original, currently unmaintained work:
 >
-> Library:  [Vim.js](https://github.com/toplan/Vim.js)
+> Library:  [Vim.js](https://github.com/toplan/Vim.js)</br>
 > Author: [Top Lan](https://github.com/toplan).
 >
-> This fork aims to maintain and improve upon the original library, bringing it
-> up to speed with modern JavaScript standards and browsers.
-
-`vim-light.js` aims to be a simple library that brings Vim-like editing
-capabilities to `textarea` and `input type="text"` web fields.
-
----
-
-## Introduction
-
-`vim-light.js` provides a lightweight and intuitive Vim-inspired editing mode
-for `textarea` and `input` fields, which might enhance the user experience
-for Vim users on the web
-
-> **Note:**
+> My original intention was to improve upon the forked library.
+> And it was a nice exercise, but ultimately I don't think it's worth continuing.
 >
-> - This library is definitely **not** designed to replace web-based IDEs!
->   It focuses on simple, text-only, online embedded use cases, where Vim-like
->   keybindings might be desirable.
-> - The library is under development, and new features or improvements _will_
->   be added over time.
-> - Use Vim shortcuts with the **American Keyboard Layout** for optimal
->   functionality.
+> After all, there are plenty of great alternatives, such as [Code Mirror](https://codemirror.net/)
+> (not exactly *light*, but nevertheless very good), or [Ace Editor](https://ace.c9.io/)
+> (which is also very good, and by the way is used by [Surfinkeys](https://github.com/brookhong/Surfingkeys), arguably the *best* Vim-like plugin for both Chrome and Firefox.)
+>
+> Which means, there's no nead for yet-another vim-like editor library for JavaScript...
+
+`vim-light.js` is simple library, providing Vim-like editing
+capabilities to `textarea` and `input type="text"` web fields.
 
 ---
 
@@ -50,7 +34,6 @@ for Vim users on the web
     });
 </script>
 ```
-`vim-light.js` has low footprint: 14 Kib minimized, XX Kib gzipped.
 
 ### Development and Build Instructions
 
@@ -158,10 +141,3 @@ Tested on the following browsers:
 | `r`                  | Replace selection                                |
 | **Change Modes**     |                                                  |
 | `Esc`                | Switch to Normal Mode                            |
-
----
-
-## Contributing
-
-If you'd like to contribute to this repo, feel free to submit pull requests or
-report issues.
